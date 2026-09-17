@@ -461,20 +461,33 @@ export default function Index() {
                 )}
 
                 <View style={styles.scoreBox}>
-                  <Text style={styles.scoreLabel}>
-                    NEAREST CUP COFFEE SCORE
-                  </Text>
+  <Text style={styles.scoreLabel}>
+    GOOGLE RATING
+  </Text>
 
-                  <Text style={styles.scoreValue}>
-                    {selectedShop.rating.toFixed(1)}
-                  </Text>
+  <Text style={styles.scoreValue}>
+    {selectedShop.googleRating.toFixed(1)}
+  </Text>
 
-                  <Text style={styles.scoreNote}>
-                    Initial score based on Google
-                    rating. We'll replace this with our
-                    coffee-specific scoring system next.
-                  </Text>
-                </View>
+  <Text style={styles.scoreNote}>
+    Based on {selectedShop.reviews.toLocaleString()} Google reviews.
+  </Text>
+</View>
+
+<View style={styles.nearestCupScoreBox}>
+  <Text style={styles.scoreLabel}>
+    NEAREST CUP SCORE
+  </Text>
+
+  <Text style={styles.comingSoonScore}>
+    —
+  </Text>
+
+  <Text style={styles.scoreNote}>
+    Coffee-specific score coming soon. This will be based on
+    coffee quality and Nearest Cup user feedback.
+  </Text>
+</View>
 
                 <View style={styles.detailActions}>
                   <Pressable
