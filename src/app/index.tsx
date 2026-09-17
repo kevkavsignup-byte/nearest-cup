@@ -798,8 +798,12 @@ useEffect(() => {
           </Text>
 
           <Text style={styles.ratingQuestion}>
-            How was the coffee?
-          </Text>
+  How was the coffee?
+</Text>
+
+<Text style={styles.ratingHint}>
+  Rate the coffee itself — taste, preparation and quality.
+</Text>
 
           <View style={styles.starRatingRow}>
             {[1, 2, 3, 4, 5].map((star) => (
