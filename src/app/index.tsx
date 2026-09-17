@@ -57,21 +57,35 @@ export default function Index() {
       }
 
       const { status: permStatus } = await Location.requestForegroundPermissionsAsync();
-      if (permStatus !== "granted") {
-        setStatus("Location denied — showing a sample area");
-        setShops(buildShops(53.3498, -6.2603));
-        setLoading(false);
-        return;
-      }
+     if (permStatus !== "granted") {
+  setStatus("Location denied — unable to find nearby cafés");
+  setLoading(false);
+  return;
+}
 
       try {
         const pos = await Location.getCurrentPositionAsync({});
-        setStatus("Using your current location");
-        setShops(buildShops(pos.coords.latitude, pos.coords.longitude));
+        setStatus("Finding cafés near you…");
+
+const nearbyShops = await buildShops(
+  pos.coords.latitude,
+  pos.coords.longitude
+);
+
+setShops(nearbyShops);
+
+setStatus(
+  nearbyShops.length
+    ? "Using your current location"
+    : "No cafés found nearby"
+);
       } catch (e) {
-        setStatus("Location unavailable — showing a sample area");
-        setShops(buildShops(53.3498, -6.2603));
-      }
+  setStatus(
+    e instanceof Error
+      ? e.message
+      : "Could not load nearby cafés"
+  );
+}
       setLoading(false);
     })();
   }, []);
