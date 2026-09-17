@@ -431,11 +431,36 @@ useEffect(() => {
               </Text>
 
               <Text style={styles.stars}>
+                Google{""}
                 {starString(item.rating)}{" "}
                 <Text style={styles.ratingNum}>
                   {item.rating.toFixed(1)}
                 </Text>
               </Text>
+
+{calculateShopCoffeeScores(
+  item.id,
+  coffeeRatings
+).coffeeQualityRatings > 0 && (
+  <Text style={styles.nearestCupCardScore}>
+    Nearest Cup{" "}
+    {calculateShopCoffeeScores(
+      item.id,
+      coffeeRatings
+    ).nearestCupScore.toFixed(1)}{" "}
+    ·{" "}
+    {calculateShopCoffeeScores(
+      item.id,
+      coffeeRatings
+    ).coffeeQualityRatings}{" "}
+    {calculateShopCoffeeScores(
+      item.id,
+      coffeeRatings
+    ).coffeeQualityRatings === 1
+      ? "rating"
+      : "ratings"}
+  </Text>
+)}
 
               <View style={styles.infoRow}>
                 <Text
@@ -1519,6 +1544,12 @@ profileLabel: {
 
 profileValue: {
   fontSize: 13,
+  fontWeight: "700",
+  color: COLORS.rust,
+},
+nearestCupCardScore: {
+  marginTop: 4,
+  fontSize: 12,
   fontWeight: "700",
   color: COLORS.rust,
 },
