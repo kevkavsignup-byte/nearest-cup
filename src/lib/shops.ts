@@ -1,4 +1,9 @@
-export type Tag = "coffee" | "matcha" | "pastries" | "brunch" | "lunch";
+export type Tag =
+  | "coffee"
+  | "matcha"
+  | "pastries"
+  | "brunch"
+  | "lunch";
 
 export interface Shop {
   id: string;
@@ -9,18 +14,27 @@ export interface Shop {
   distKmRaw: number;
   distKm: number;
   mins: number;
-  rating: number;
+
+  // Google data
+  googleRating: number;
   reviews: number;
-  recentRating: number;
-  weightedScore: number;
-  tags: Tag[];
-  openNow: boolean;
   priceLevel: 1 | 2 | 3;
-  wifi: boolean;
-  hue: number;
   address?: string;
   website?: string;
   googleMapsUrl?: string;
+
+  // Nearest Cup data
+  nearestCupScore: number;
+
+  // Kept for compatibility with the current ranking code
+  rating: number;
+  recentRating: number;
+  weightedScore: number;
+
+  tags: Tag[];
+  openNow: boolean;
+  wifi: boolean;
+  hue: number;
 }
 
 export const ALL_TAGS: Tag[] = [
@@ -49,6 +63,40 @@ export const TAG_ICON: Record<Tag, string> = {
 
 const WALK_SPEED_KMH = 5;
 
+/*
+ * V1 Nearest Cup scoring
+ *
+ * We start with a confidence-adjusted Google rating.
+ *
+ * A café with a very high rating but only a handful of reviews
+ * should not automatically outrank a café with a slightly lower
+ * rating supported by hundreds of reviews.
+ *
+ * This is NOT the final Coffee Score.
+ * Later we will incorporate coffee-specific data.
+ */
+
+const SCORE_BASELINE = 4.2;
+const SCORE_CONFIDENCE_REVIEWS = 50;
+
+function calculateNearestCupScore(
+  rating: number,
+  reviews: number
+) {
+  if (!rating || !reviews) {
+    return 0;
+  }
+
+  const adjustedRating =
+    (reviews / (reviews + SCORE_CONFIDENCE_REVIEWS)) *
+      rating +
+    (SCORE_CONFIDENCE_REVIEWS /
+      (reviews + SCORE_CONFIDENCE_REVIEWS)) *
+      SCORE_BASELINE;
+
+  return Math.round(adjustedRating * 100) / 100;
+}
+
 function hashHue(str: string) {
   let h = 0;
 
@@ -76,26 +124,39 @@ export function haversineKm(
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLng / 2) ** 2;
 
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return (
+    R *
+    2 *
+    Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  );
 }
 
 type GooglePlace = {
   id?: string;
+
   displayName?: {
     text?: string;
   };
+
   location?: {
     latitude?: number;
     longitude?: number;
   };
+
   rating?: number;
+
   userRatingCount?: number;
+
   priceLevel?: string;
+
   regularOpeningHours?: {
     openNow?: boolean;
   };
+
   types?: string[];
+
   formattedAddress?: string;
+
   websiteUri?: string;
 };
 
@@ -134,6 +195,7 @@ function priceLevel(value?: string): 1 | 2 | 3 {
 
 function tagsForPlace(place: GooglePlace): Tag[] {
   const types = new Set(place.types ?? []);
+
   const tags: Tag[] = [];
 
   if (
@@ -195,6 +257,7 @@ async function searchPlaces(
             latitude: lat,
             longitude: lng,
           },
+
           radius: 2500,
         },
       },
@@ -233,8 +296,19 @@ export async function buildShops(
   }
 
   const results = await Promise.all([
-    searchPlaces(lat, lng, "cafe", apiKey),
-    searchPlaces(lat, lng, "coffee_shop", apiKey),
+    searchPlaces(
+      lat,
+      lng,
+      "cafe",
+      apiKey
+    ),
+
+    searchPlaces(
+      lat,
+      lng,
+      "coffee_shop",
+      apiKey
+    ),
   ]);
 
   const unique = new Map<string, GooglePlace>();
@@ -248,13 +322,18 @@ export async function buildShops(
   return [...unique.values()]
     .filter(
       (place) =>
-        typeof place.location?.latitude === "number" &&
-        typeof place.location?.longitude === "number" &&
+        typeof place.location?.latitude ===
+          "number" &&
+        typeof place.location?.longitude ===
+          "number" &&
         !!place.displayName?.text
     )
     .map((place) => {
-      const shopLat = place.location!.latitude!;
-      const shopLng = place.location!.longitude!;
+      const shopLat =
+        place.location!.latitude!;
+
+      const shopLng =
+        place.location!.longitude!;
 
       const distKm = haversineKm(
         lat,
@@ -263,10 +342,21 @@ export async function buildShops(
         shopLng
       );
 
-      const rating = place.rating ?? 0;
-      const reviews = place.userRatingCount ?? 0;
+      const googleRating =
+        place.rating ?? 0;
+
+      const reviews =
+        place.userRatingCount ?? 0;
+
+      const nearestCupScore =
+        calculateNearestCupScore(
+          googleRating,
+          reviews
+        );
+
       const openNow =
-        place.regularOpeningHours?.openNow ?? false;
+        place.regularOpeningHours?.openNow ??
+        false;
 
       return {
         id: place.id!,
@@ -286,16 +376,25 @@ export async function buildShops(
 
         mins: Math.max(
           1,
-          Math.round((distKm / WALK_SPEED_KMH) * 60)
+          Math.round(
+            (distKm / WALK_SPEED_KMH) * 60
+          )
         ),
 
-        rating,
+        // Google rating remains separate
+        googleRating,
+
         reviews,
 
-        recentRating: rating,
+        // Nearest Cup's own score
+        nearestCupScore,
 
-        weightedScore:
-          Math.round(rating * 100) / 100,
+        // Compatibility with existing UI
+        rating: googleRating,
+
+        recentRating: googleRating,
+
+        weightedScore: nearestCupScore,
 
         tags: tagsForPlace(place),
 
@@ -311,9 +410,11 @@ export async function buildShops(
           place.displayName!.text!
         ),
 
-        address: place.formattedAddress,
+        address:
+          place.formattedAddress,
 
-        website: place.websiteUri,
+        website:
+          place.websiteUri,
 
         googleMapsUrl:
           `https://www.google.com/maps/search/?api=1` +
@@ -327,11 +428,12 @@ export async function buildShops(
     })
     .sort((a, b) => {
       if (
-        b.weightedScore !== a.weightedScore
+        b.nearestCupScore !==
+        a.nearestCupScore
       ) {
         return (
-          b.weightedScore -
-          a.weightedScore
+          b.nearestCupScore -
+          a.nearestCupScore
         );
       }
 
@@ -352,7 +454,9 @@ export function filterAndRank(
   f: Filters
 ): Shop[] {
   return shops
-    .filter((s) => s.mins <= f.maxMins)
+    .filter(
+      (s) => s.mins <= f.maxMins
+    )
 
     .filter(
       (s) =>
@@ -376,11 +480,12 @@ export function filterAndRank(
 
     .sort((a, b) => {
       if (
-        b.weightedScore !== a.weightedScore
+        b.nearestCupScore !==
+        a.nearestCupScore
       ) {
         return (
-          b.weightedScore -
-          a.weightedScore
+          b.nearestCupScore -
+          a.nearestCupScore
         );
       }
 
