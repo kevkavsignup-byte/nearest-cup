@@ -232,6 +232,8 @@ type GooglePlace = {
   formattedAddress?: string;
 
   websiteUri?: string;
+
+  businessStatus?: string;
 };
 
 const PLACES_URL =
@@ -248,6 +250,7 @@ const FIELD_MASK = [
   "places.types",
   "places.formattedAddress",
   "places.websiteUri",
+  "places.businessStatus",
 ].join(",");
 
 function priceLevel(
@@ -377,7 +380,13 @@ async function searchPlaces(
       places?: GooglePlace[];
     };
 
-  return data.places ?? [];
+  return (data.places ?? []).filter(
+  (place) =>
+    place.businessStatus !==
+      "CLOSED_PERMANENTLY" &&
+    place.businessStatus !==
+      "CLOSED_TEMPORARILY"
+);
 }
 
 export async function buildShops(
@@ -630,7 +639,6 @@ export function filterAndRank(
       (s) =>
         s.mins <= f.maxMins
     )
-
     .filter(
       (s) =>
         f.activeTags.size === 0 ||
@@ -638,34 +646,48 @@ export function filterAndRank(
           f.activeTags.has(t)
         )
     )
-
     .filter(
       (s) =>
         !f.requireOpen ||
         s.openNow
     )
-
     .filter(
       (s) =>
         !f.favoritesOnly ||
         f.favorites.has(s.id)
     )
-
     .sort((a, b) => {
+      const aGoogleScore =
+        a.googleRating +
+        (Math.min(a.reviews, 500) / 500) * 0.2;
+
+      const bGoogleScore =
+        b.googleRating +
+        (Math.min(b.reviews, 500) / 500) * 0.2;
+
+      const aDistanceBonus =
+        Math.max(0, 5 - a.mins) * 0.02;
+
+      const bDistanceBonus =
+        Math.max(0, 5 - b.mins) * 0.02;
+
+      const aRecommendationScore =
+        aGoogleScore + aDistanceBonus;
+
+      const bRecommendationScore =
+        bGoogleScore + bDistanceBonus;
+
       if (
-        b.nearestCupScore !==
-        a.nearestCupScore
+        bRecommendationScore !==
+        aRecommendationScore
       ) {
         return (
-          b.nearestCupScore -
-          a.nearestCupScore
+          bRecommendationScore -
+          aRecommendationScore
         );
       }
 
-      return (
-        b.reviews -
-        a.reviews
-      );
+      return b.reviews - a.reviews;
     });
 }
 
