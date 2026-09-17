@@ -820,9 +820,13 @@ useEffect(() => {
             ))}
           </View>
 
-          <Text style={styles.ratingQuestion}>
-            What did you have?
-          </Text>
+         <Text style={styles.ratingQuestion}>
+  What did you have?
+</Text>
+
+<Text style={styles.ratingHint}>
+  This helps us build a coffee profile for each café.
+</Text>
 
           <View style={styles.drinkOptions}>
             {[
@@ -1413,6 +1417,13 @@ ratingQuestion: {
   fontSize: 13,
   fontWeight: "700",
   marginBottom: 10,
+},
+
+ratingHint: {
+  marginTop: -4,
+  marginBottom: 10,
+  fontSize: 12,
+  color: COLORS.muted,
 },
 
 starRatingRow: {
