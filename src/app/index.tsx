@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Linking,
+  Modal,
 } from "react-native";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -45,7 +46,7 @@ export default function Index() {
   const [requireOpen, setRequireOpen] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -107,8 +108,11 @@ setStatus(
     });
   }, []);
 
-  const openDirections = (shop: Shop) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${shop.lat},${shop.lng}&travelmode=walking`;
+   const openDirections = (shop: Shop) => {
+    const url =
+      shop.googleMapsUrl ??
+      `https://www.google.com/maps/dir/?api=1&destination=${shop.lat},${shop.lng}&travelmode=walking`;
+
     Linking.openURL(url);
   };
 
@@ -195,10 +199,14 @@ setStatus(
           <Text style={styles.empty}>Nothing matches — try widening the walk or clearing a filter.</Text>
         }
         renderItem={({ item, index }) => (
-          <View style={styles.card}>
+                    <Pressable
+            style={styles.card}
+            onPress={() => setSelectedShop(item)}
+          >
             <View style={[styles.photo, { backgroundColor: `hsl(${item.hue}, 48%, 42%)` }]}>
               <Text style={{ fontSize: 22 }}>{TAG_ICON[item.tags[1] ?? "coffee"]}</Text>
-            </View>
+                      </Pressable>
+        )}
             <View style={styles.cardMid}>
               <Text style={styles.rank}>No. {index + 1}</Text>
               <Text style={styles.name}>{item.name}</Text>
@@ -234,6 +242,137 @@ setStatus(
           </View>
         )}
       />
+            <Modal
+        visible={selectedShop !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSelectedShop(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.detailCard}>
+            {selectedShop && (
+              <>
+                <View style={styles.detailTopRow}>
+                  <Text style={styles.detailKicker}>Nearest Cup</Text>
+                  <Pressable
+                    onPress={() => setSelectedShop(null)}
+                    style={styles.closeBtn}
+                  >
+                    <Text style={styles.closeText}>✕</Text>
+                  </Pressable>
+                </View>
+
+                <View
+                  style={[
+                    styles.detailPhoto,
+                    {
+                      backgroundColor: `hsl(${selectedShop.hue}, 48%, 42%)`,
+                    },
+                  ]}
+                >
+                  <Text style={{ fontSize: 36 }}>
+                    {TAG_ICON[selectedShop.tags[0] ?? "coffee"]}
+                  </Text>
+                </View>
+
+                <Text style={styles.detailName}>
+                  {selectedShop.name}
+                </Text>
+
+                <Text style={styles.detailRating}>
+                  {starString(selectedShop.rating)}{" "}
+                  <Text style={styles.detailRatingNumber}>
+                    {selectedShop.rating.toFixed(1)}
+                  </Text>
+                </Text>
+
+                <Text style={styles.detailReviews}>
+                  {selectedShop.reviews.toLocaleString()} Google reviews
+                  {" · "}
+                  {"€".repeat(selectedShop.priceLevel)}
+                </Text>
+
+                <View style={styles.detailStatusRow}>
+                  <Text
+                    style={[
+                      styles.detailStatus,
+                      selectedShop.openNow
+                        ? styles.detailStatusOpen
+                        : styles.detailStatusClosed,
+                    ]}
+                  >
+                    {selectedShop.openNow ? "Open now" : "Closed"}
+                  </Text>
+
+                  <Text style={styles.detailWalk}>
+                    {selectedShop.mins} min walk ·{" "}
+                    {selectedShop.distKm.toFixed(1)} km
+                  </Text>
+                </View>
+
+                {selectedShop.address && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>Address</Text>
+                    <Text style={styles.detailBody}>
+                      {selectedShop.address}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.scoreBox}>
+                  <Text style={styles.scoreLabel}>
+                    NEAREST CUP COFFEE SCORE
+                  </Text>
+                  <Text style={styles.scoreValue}>
+                    {selectedShop.rating.toFixed(1)}
+                  </Text>
+                  <Text style={styles.scoreNote}>
+                    Initial score based on Google rating. We'll replace this
+                    with our coffee-specific scoring system next.
+                  </Text>
+                </View>
+
+                <View style={styles.detailActions}>
+                  <Pressable
+                    onPress={() => toggleFavorite(selectedShop.id)}
+                    style={[
+                      styles.detailFavoriteBtn,
+                      favorites.has(selectedShop.id) &&
+                        styles.detailFavoriteBtnActive,
+                    ]}
+                  >
+                    <Text style={styles.detailFavoriteText}>
+                      {favorites.has(selectedShop.id)
+                        ? "♥ Saved"
+                        : "♡ Save"}
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => openDirections(selectedShop)}
+                    style={styles.detailDirectionsBtn}
+                  >
+                    <Text style={styles.detailDirectionsText}>
+                      Directions →
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {selectedShop.website && (
+                  <Pressable
+                    onPress={() => Linking.openURL(selectedShop.website!)}
+                    style={styles.websiteBtn}
+                  >
+                    <Text style={styles.websiteText}>
+                      Visit website ↗
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -275,4 +414,219 @@ const styles = StyleSheet.create({
   walk: { fontSize: 18, fontWeight: "700", color: COLORS.ink },
   walkLabel: { fontSize: 11, color: COLORS.ink, opacity: 0.6, marginTop: 2 },
   empty: { textAlign: "center", opacity: 0.6, marginTop: 30, paddingHorizontal: 20 },
+    modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(36,26,18,0.45)",
+    justifyContent: "flex-end",
+  },
+
+  detailCard: {
+    backgroundColor: COLORS.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 22,
+    paddingBottom: 34,
+    maxHeight: "90%",
+  },
+
+  detailTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+
+  detailKicker: {
+    color: COLORS.rust,
+    fontWeight: "700",
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.cream2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  closeText: {
+    color: COLORS.ink,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  detailPhoto: {
+    width: "100%",
+    height: 110,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+
+  detailName: {
+    color: COLORS.ink,
+    fontWeight: "700",
+    fontSize: 25,
+    marginBottom: 6,
+  },
+
+  detailRating: {
+    color: COLORS.gold,
+    fontSize: 16,
+    marginBottom: 4,
+  },
+
+  detailRatingNumber: {
+    color: COLORS.ink,
+    fontWeight: "700",
+  },
+
+  detailReviews: {
+    color: COLORS.ink,
+    opacity: 0.65,
+    fontSize: 13,
+  },
+
+  detailStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 14,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line,
+  },
+
+  detailStatus: {
+    fontSize: 12,
+    fontWeight: "700",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 100,
+    backgroundColor: COLORS.cream2,
+    overflow: "hidden",
+  },
+
+  detailStatusOpen: {
+    color: COLORS.green,
+  },
+
+  detailStatusClosed: {
+    color: COLORS.ink,
+    opacity: 0.55,
+  },
+
+  detailWalk: {
+    color: COLORS.ink,
+    opacity: 0.65,
+    fontSize: 12,
+  },
+
+  detailSection: {
+    marginTop: 16,
+  },
+
+  detailSectionTitle: {
+    color: COLORS.ink,
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    opacity: 0.5,
+    marginBottom: 5,
+  },
+
+  detailBody: {
+    color: COLORS.ink,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  scoreBox: {
+    marginTop: 18,
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: COLORS.cream2,
+  },
+
+  scoreLabel: {
+    color: COLORS.ink,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    opacity: 0.55,
+  },
+
+  scoreValue: {
+    color: COLORS.espresso,
+    fontSize: 34,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+
+  scoreNote: {
+    color: COLORS.ink,
+    opacity: 0.6,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
+  },
+
+  detailActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 18,
+  },
+
+  detailFavoriteBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  detailFavoriteBtnActive: {
+    backgroundColor: COLORS.rust,
+    borderColor: COLORS.rust,
+  },
+
+  detailFavoriteText: {
+    color: COLORS.ink,
+    fontWeight: "700",
+    fontSize: 13,
+  },
+
+  detailDirectionsBtn: {
+    flex: 1.5,
+    height: 46,
+    borderRadius: 11,
+    backgroundColor: COLORS.espresso,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  detailDirectionsText: {
+    color: COLORS.cream,
+    fontWeight: "700",
+    fontSize: 13,
+  },
+
+  websiteBtn: {
+    alignItems: "center",
+    paddingTop: 16,
+  },
+
+  websiteText: {
+    color: COLORS.rust,
+    fontSize: 13,
+    fontWeight: "700",
+  },
 });
