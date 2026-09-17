@@ -631,24 +631,31 @@ useEffect(() => {
 </Text>
 
 <Text style={styles.scoreNote}>
-  {calculateShopCoffeeScores(
-    selectedShop.id,
-    coffeeRatings
-  ).coffeeQualityRatings > 0
-    ? `Based on ${
-        calculateShopCoffeeScores(
-          selectedShop.id,
-          coffeeRatings
-        ).coffeeQualityRatings
-      } Nearest Cup rating${
-        calculateShopCoffeeScores(
-          selectedShop.id,
-          coffeeRatings
-        ).coffeeQualityRatings === 1
-          ? ""
-          : "s"
-      }.`
-    : "No Nearest Cup ratings yet."}
+  {(() => {
+    const ratingCount =
+      calculateShopCoffeeScores(
+        selectedShop.id,
+        coffeeRatings
+      ).coffeeQualityRatings;
+
+    if (ratingCount === 0) {
+      return "No Nearest Cup ratings yet.";
+    }
+
+    let confidence = "Early signal";
+
+    if (ratingCount >= 10) {
+      confidence = "Established signal";
+    } else if (ratingCount >= 5) {
+      confidence = "Good signal";
+    } else if (ratingCount >= 2) {
+      confidence = "Emerging signal";
+    }
+
+    return `Based on ${ratingCount} Nearest Cup ${
+      ratingCount === 1 ? "rating" : "ratings"
+    }. ${confidence}.`;
+  })()}
 </Text>
 </View>
 
