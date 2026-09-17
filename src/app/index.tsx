@@ -319,32 +319,39 @@ useEffect(() => {
         What you're after
       </Text>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.rowScroll}
-        contentContainerStyle={{ alignItems: "center" }}
+    <ScrollView
+  horizontal
+  showsHorizontalScrollIndicator={false}
+  style={{
+    marginBottom: 16,
+    overflow: "visible",
+  }}
+  contentContainerStyle={{
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingRight: 8,
+  }}
+>
+  {ALL_TAGS.map((tag) => (
+    <Pressable
+      key={tag}
+      onPress={() => toggleTag(tag)}
+      style={[
+        styles.chip,
+        activeTags.has(tag) && styles.chipTagActive,
+      ]}
+    >
+      <Text
+        style={[
+          styles.chipText,
+          activeTags.has(tag) && styles.chipTextActive,
+        ]}
       >
-        {ALL_TAGS.map((tag) => (
-          <Pressable
-            key={tag}
-            onPress={() => toggleTag(tag)}
-            style={[
-              styles.chip,
-              activeTags.has(tag) && styles.chipTagActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                activeTags.has(tag) && styles.chipTextActive,
-              ]}
-            >
-              {TAG_LABEL[tag]}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+        {TAG_LABEL[tag]}
+      </Text>
+    </Pressable>
+  ))}
+</ScrollView>
 
       <View style={styles.row}>
         <Pressable
@@ -999,25 +1006,22 @@ const styles = StyleSheet.create({
   },
 
   row: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 16,
-    flexWrap: "wrap",
-  },
+  flexDirection: "row",
+  marginBottom: 16,
+  flexWrap: "wrap",
+},
 
-  rowScroll: {
-    marginBottom: 16,
-    height: 44,
-  },
 
   chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    marginRight: 8,
-  },
+  height: 36,
+  paddingHorizontal: 14,
+  borderRadius: 100,
+  borderWidth: 1,
+  borderColor: COLORS.line,
+  marginRight: 8,
+  alignItems: "center",
+  justifyContent: "center",
+},
 
   chipActive: {
     backgroundColor: COLORS.espresso,
@@ -1035,11 +1039,10 @@ const styles = StyleSheet.create({
   },
 
   chipText: {
-    color: COLORS.ink,
-    fontSize: 13,
-    fontWeight: "500",
-    lineHeight: 16,
-  },
+  color: COLORS.ink,
+  fontSize: 13,
+  fontWeight: "500",
+},
 
   chipTextActive: {
     color: COLORS.cream,
