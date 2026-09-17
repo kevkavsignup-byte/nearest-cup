@@ -23,6 +23,121 @@ import {
   starString,
 } from "../lib/shops";
 
+type CoffeeRating = {
+  shopId: string;
+  rating: number;
+  drinkType: string;
+  createdAt: string;
+};
+function calculateShopCoffeeScores(
+  shopId: string,
+  ratings: CoffeeRating[]
+) {
+  const shopRatings = ratings.filter(
+    (rating) => rating.shopId === shopId
+  );
+
+  if (shopRatings.length === 0) {
+    return {
+      coffeeQualityScore: 0,
+      consistencyScore: 0,
+      milkDrinksScore: 0,
+      espressoScore: 0,
+      filterScore: 0,
+      coffeeQualityRatings: 0,
+      consistencyRatings: 0,
+      milkDrinksRatings: 0,
+      espressoRatings: 0,
+      filterRatings: 0,
+      nearestCupScore: 0,
+    };
+  }
+
+  const average = (items: CoffeeRating[]) => {
+    if (items.length === 0) return 0;
+
+    const total = items.reduce(
+      (sum, item) => sum + item.rating,
+      0
+    );
+
+    return Math.round(
+      (total / items.length) * 10
+    ) / 10;
+  };
+
+  const milkDrinks = shopRatings.filter(
+    (rating) =>
+      rating.drinkType === "Flat white" ||
+      rating.drinkType === "Cappuccino" ||
+      rating.drinkType === "Latte"
+  );
+
+  const espresso = shopRatings.filter(
+    (rating) => rating.drinkType === "Espresso"
+  );
+
+  const filter = shopRatings.filter(
+    (rating) => rating.drinkType === "Filter"
+  );
+
+  const coffeeQualityScore = average(shopRatings);
+  const milkDrinksScore = average(milkDrinks);
+  const espressoScore = average(espresso);
+  const filterScore = average(filter);
+
+  const components = [
+    {
+      score: coffeeQualityScore,
+      weight: 0.4,
+    },
+    {
+      score: milkDrinksScore,
+      weight: 0.15,
+    },
+    {
+      score: espressoScore,
+      weight: 0.15,
+    },
+    {
+      score: filterScore,
+      weight: 0.1,
+    },
+  ].filter((component) => component.score > 0);
+
+  const totalWeight = components.reduce(
+    (sum, component) => sum + component.weight,
+    0
+  );
+
+  const weightedScore =
+    components.length > 0
+      ? components.reduce(
+          (sum, component) =>
+            sum +
+            component.score * component.weight,
+          0
+        ) / totalWeight
+      : 0;
+
+  return {
+    coffeeQualityScore,
+    consistencyScore: 0,
+    milkDrinksScore,
+    espressoScore,
+    filterScore,
+
+    coffeeQualityRatings: shopRatings.length,
+    consistencyRatings: 0,
+    milkDrinksRatings: milkDrinks.length,
+    espressoRatings: espresso.length,
+    filterRatings: filter.length,
+
+    nearestCupScore:
+      Math.round(weightedScore * 10) / 10,
+  };
+}
+
 const COLORS = {
   cream: "#F3E9DC",
   cream2: "#EADFCE",
@@ -37,9 +152,11 @@ const COLORS = {
 
 const WALK_OPTIONS = [10, 15, 20];
 const FAVORITES_KEY = "nearestcup:favorites";
+const COFFEE_RATINGS_KEY = "nearestCupCoffeeRatings";
 
 export default function Index() {
   const [status, setStatus] = useState("Finding your location…");
+  const [coffeeRatings, setCoffeeRatings] = useState<CoffeeRating[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [maxMins, setMaxMins] = useState(10);
   const [activeTags, setActiveTags] = useState<Set<Tag>>(new Set());
@@ -48,6 +165,27 @@ export default function Index() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
+  const [ratingShop, setRatingShop] = useState<Shop | null>(null);
+  const [coffeeRating, setCoffeeRating] = useState(0);
+  const [drinkType, setDrinkType] = useState("");
+  
+useEffect(() => {
+  const loadCoffeeRatings = async () => {
+    try {
+      const savedRatings = await AsyncStorage.getItem(
+        COFFEE_RATINGS_KEY
+      );
+
+      if (savedRatings) {
+        setCoffeeRatings(JSON.parse(savedRatings));
+      }
+    } catch (error) {
+      console.log("Could not load coffee ratings:", error);
+    }
+  };
+
+  loadCoffeeRatings();
+}, []);
 
   useEffect(() => {
     (async () => {
@@ -372,7 +510,11 @@ export default function Index() {
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.detailCard}>
-            {selectedShop && (
+  <ScrollView
+    showsVerticalScrollIndicator={false}
+    contentContainerStyle={{ paddingBottom: 10 }}
+  >
+    {selectedShop && (
               <>
                 <View style={styles.detailTopRow}>
                   <Text style={styles.detailKicker}>
@@ -445,22 +587,19 @@ export default function Index() {
                     {selectedShop.distKm.toFixed(1)} km
                   </Text>
                 </View>
+{selectedShop.address && (
+  <View style={styles.detailSection}>
+    <Text style={styles.detailSectionTitle}>
+      Address
+    </Text>
 
-                {selectedShop.address && (
-                  <View style={styles.detailSection}>
-                    <Text
-                      style={styles.detailSectionTitle}
-                    >
-                      Address
-                    </Text>
+    <Text style={styles.detailBody}>
+      {selectedShop.address}
+    </Text>
+  </View>
+)}
 
-                    <Text style={styles.detailBody}>
-                      {selectedShop.address}
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.scoreBox}>
+<View style={styles.scoreBox}>
   <Text style={styles.scoreLabel}>
     GOOGLE RATING
   </Text>
@@ -479,71 +618,289 @@ export default function Index() {
     NEAREST CUP SCORE
   </Text>
 
-  <Text style={styles.comingSoonScore}>
-    —
-  </Text>
+  <Text style={styles.scoreValue}>
+  {calculateShopCoffeeScores(
+    selectedShop.id,
+    coffeeRatings
+  ).nearestCupScore > 0
+    ? calculateShopCoffeeScores(
+        selectedShop.id,
+        coffeeRatings
+      ).nearestCupScore.toFixed(1)
+    : "—"}
+</Text>
 
-  <Text style={styles.scoreNote}>
-    Coffee-specific score coming soon. This will be based on
-    coffee quality and Nearest Cup user feedback.
-  </Text>
+<Text style={styles.scoreNote}>
+  {calculateShopCoffeeScores(
+    selectedShop.id,
+    coffeeRatings
+  ).coffeeQualityRatings > 0
+    ? `Based on ${
+        calculateShopCoffeeScores(
+          selectedShop.id,
+          coffeeRatings
+        ).coffeeQualityRatings
+      } Nearest Cup rating${
+        calculateShopCoffeeScores(
+          selectedShop.id,
+          coffeeRatings
+        ).coffeeQualityRatings === 1
+          ? ""
+          : "s"
+      }.`
+    : "No Nearest Cup ratings yet."}
+</Text>
 </View>
 
-                <View style={styles.detailActions}>
-                  <Pressable
-                    onPress={() =>
-                      toggleFavorite(selectedShop.id)
-                    }
-                    style={[
-                      styles.detailFavoriteBtn,
-                      favorites.has(selectedShop.id) &&
-                        styles.detailFavoriteBtnActive,
-                    ]}
-                  >
-                    <Text
-                      style={styles.detailFavoriteText}
-                    >
-                      {favorites.has(selectedShop.id)
-                        ? "♥ Saved"
-                        : "♡ Save"}
-                    </Text>
-                  </Pressable>
+<View style={styles.detailActions}>
+  <Pressable
+    onPress={() =>
+      toggleFavorite(selectedShop.id)
+    }
+    style={[
+      styles.detailFavoriteBtn,
+      favorites.has(selectedShop.id) &&
+        styles.detailFavoriteBtnActive,
+    ]}
+  >
+    <Text style={styles.detailFavoriteText}>
+      {favorites.has(selectedShop.id)
+        ? "♥ Saved"
+        : "♡ Save"}
+    </Text>
+  </Pressable>
 
-                  <Pressable
-                    onPress={() =>
-                      openDirections(selectedShop)
-                    }
-                    style={styles.detailDirectionsBtn}
-                  >
-                    <Text
-                      style={
-                        styles.detailDirectionsText
-                      }
-                    >
-                      Directions →
-                    </Text>
-                  </Pressable>
-                </View>
+  <Pressable
+    onPress={() =>
+      openDirections(selectedShop)
+    }
+    style={styles.detailDirectionsBtn}
+  >
+    <Text style={styles.detailDirectionsText}>
+      Directions →
+    </Text>
+  </Pressable>
+</View>
 
-                {selectedShop.website && (
-                  <Pressable
-                    onPress={() =>
-                      Linking.openURL(
-                        selectedShop.website!
-                      )
-                    }
-                    style={styles.websiteBtn}
-                  >
-                    <Text style={styles.websiteText}>
-                      Visit website ↗
-                    </Text>
-                  </Pressable>
-                )}
-              </>
-            )}
+{selectedShop.website && (
+  <Pressable
+    onPress={() =>
+      Linking.openURL(
+        selectedShop.website!
+      )
+    }
+    style={styles.websiteBtn}
+  >
+    <Text style={styles.websiteText}>
+      Visit website ↗
+    </Text>
+  </Pressable>
+)}
+
+<View style={styles.coffeeProfile}>
+  <Text style={styles.coffeeProfileTitle}>Coffee profile</Text>
+
+  {(() => {
+    const scores = calculateShopCoffeeScores(
+      selectedShop.id,
+      coffeeRatings
+    );
+
+    return (
+      <>
+        {scores.milkDrinksRatings > 0 && (
+          <View style={styles.profileRow}>
+            <Text style={styles.profileLabel}>Milk drinks</Text>
+            <Text style={styles.profileValue}>
+              {scores.milkDrinksScore.toFixed(1)}
+            </Text>
           </View>
-        </View>
-      </Modal>
+        )}
+
+        {scores.espressoRatings > 0 && (
+          <View style={styles.profileRow}>
+            <Text style={styles.profileLabel}>Espresso</Text>
+            <Text style={styles.profileValue}>
+              {scores.espressoScore.toFixed(1)}
+            </Text>
+          </View>
+        )}
+
+        {scores.filterRatings > 0 && (
+          <View style={styles.profileRow}>
+            <Text style={styles.profileLabel}>Filter</Text>
+            <Text style={styles.profileValue}>
+              {scores.filterScore.toFixed(1)}
+            </Text>
+          </View>
+        )}
+
+        {scores.consistencyRatings > 0 && (
+          <View style={styles.profileRow}>
+            <Text style={styles.profileLabel}>Consistency</Text>
+            <Text style={styles.profileValue}>
+              {scores.consistencyScore.toFixed(1)}
+            </Text>
+          </View>
+        )}
+      </>
+    );
+  })()}
+</View>
+
+<Pressable
+  onPress={() => setRatingShop(selectedShop)}
+  style={styles.rateCoffeeBtn}
+>
+  <Text style={styles.rateCoffeeText}>
+    ★ Rate this coffee
+  </Text>
+</Pressable>
+                </>
+              )}
+           </ScrollView>
+             </View>
+  </View>
+</Modal>
+
+<Modal
+  visible={ratingShop !== null}
+  animationType="slide"
+  transparent
+  onRequestClose={() => setRatingShop(null)}
+>
+  <View style={styles.modalBackdrop}>
+    <View style={styles.ratingCard}>
+      <View style={styles.detailTopRow}>
+        <Text style={styles.detailKicker}>
+          Rate your coffee
+        </Text>
+
+        <Pressable
+          onPress={() => setRatingShop(null)}
+          style={styles.closeBtn}
+        >
+          <Text style={styles.closeText}>✕</Text>
+        </Pressable>
+      </View>
+
+      {ratingShop && (
+        <>
+          <Text style={styles.ratingShopName}>
+            {ratingShop.name}
+          </Text>
+
+          <Text style={styles.ratingQuestion}>
+            How was the coffee?
+          </Text>
+
+          <View style={styles.starRatingRow}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Pressable
+                key={star}
+                onPress={() => setCoffeeRating(star)}
+              >
+                <Text
+                  style={[
+                    styles.ratingStar,
+                    star <= coffeeRating &&
+                      styles.ratingStarSelected,
+                  ]}
+                >
+                  ★
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.ratingQuestion}>
+            What did you have?
+          </Text>
+
+          <View style={styles.drinkOptions}>
+            {[
+              "Flat white",
+              "Cappuccino",
+              "Latte",
+              "Espresso",
+              "Filter",
+              "Other",
+            ].map((drink) => (
+              <Pressable
+                key={drink}
+                onPress={() => setDrinkType(drink)}
+                style={[
+                  styles.drinkOption,
+                  drinkType === drink &&
+                    styles.drinkOptionSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.drinkOptionText,
+                    drinkType === drink &&
+                      styles.drinkOptionTextSelected,
+                  ]}
+                >
+                  {drink}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Pressable
+            onPress={async () => {
+  if (!ratingShop || coffeeRating === 0 || !drinkType) {
+    return;
+  }
+
+  const newRating: CoffeeRating = {
+    shopId: ratingShop.id,
+    rating: coffeeRating,
+    drinkType,
+    createdAt: new Date().toISOString(),
+  };
+
+  try {
+    const existingRatings = await AsyncStorage.getItem(
+      COFFEE_RATINGS_KEY
+    );
+
+    const ratings: CoffeeRating[] = existingRatings
+      ? JSON.parse(existingRatings)
+      : [];
+
+    ratings.push(newRating);
+
+    await AsyncStorage.setItem(
+      COFFEE_RATINGS_KEY,
+      JSON.stringify(ratings)
+    );
+
+    setCoffeeRatings(ratings);
+
+    setRatingShop(null);
+    setCoffeeRating(0);
+    setDrinkType("");
+  } catch (error) {
+    console.log("Could not save coffee rating:", error);
+  }
+}}
+            style={[
+  styles.submitRatingBtn,
+  (coffeeRating === 0 || !drinkType) &&
+    styles.submitRatingBtnDisabled,
+]}
+          >
+            <Text style={styles.submitRatingText}>
+              Submit rating
+            </Text>
+          </Pressable>
+        </>
+      )}
+    </View>
+  </View>
+</Modal>
     </View>
   );
 }
@@ -931,6 +1288,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cream2,
   },
 
+  nearestCupScoreBox: {
+  marginTop: 10,
+  padding: 16,
+  borderRadius: 14,
+  backgroundColor: COLORS.cream2,
+  borderWidth: 0,
+},
+
   scoreLabel: {
     color: COLORS.ink,
     fontSize: 10,
@@ -1006,4 +1371,133 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
+
+rateCoffeeBtn: {
+  alignItems: "center",
+  marginTop: 14,
+  paddingVertical: 13,
+  borderRadius: 11,
+  borderWidth: 1,
+  borderColor: COLORS.rust,
+},
+
+rateCoffeeText: {
+  color: COLORS.rust,
+  fontSize: 13,
+  fontWeight: "700",
+},
+ratingCard: {
+  backgroundColor: COLORS.card,
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+  padding: 22,
+  paddingBottom: 34,
+},
+
+ratingShopName: {
+  color: COLORS.ink,
+  fontSize: 22,
+  fontWeight: "700",
+  marginBottom: 22,
+},
+
+ratingQuestion: {
+  color: COLORS.ink,
+  fontSize: 13,
+  fontWeight: "700",
+  marginBottom: 10,
+},
+
+starRatingRow: {
+  flexDirection: "row",
+  gap: 8,
+  marginBottom: 24,
+},
+
+ratingStar: {
+  fontSize: 38,
+  color: COLORS.line,
+},
+
+ratingStarSelected: {
+  color: COLORS.gold,
+},
+
+drinkOptions: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8,
+  marginBottom: 24,
+},
+
+drinkOption: {
+  paddingVertical: 9,
+  paddingHorizontal: 13,
+  borderRadius: 100,
+  borderWidth: 1,
+  borderColor: COLORS.line,
+},
+
+drinkOptionSelected: {
+  backgroundColor: COLORS.espresso,
+  borderColor: COLORS.espresso,
+},
+
+drinkOptionText: {
+  color: COLORS.ink,
+  fontSize: 12,
+},
+
+drinkOptionTextSelected: {
+  color: COLORS.cream,
+  fontWeight: "700",
+},
+
+submitRatingBtn: {
+  height: 48,
+  borderRadius: 11,
+  backgroundColor: COLORS.espresso,
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+submitRatingText: {
+  color: COLORS.cream,
+  fontSize: 13,
+  fontWeight: "700",
+},
+
+submitRatingBtnDisabled: {
+  opacity: 0.45,
+},
+coffeeProfile: {
+  marginTop: 10,
+  padding: 16,
+  borderRadius: 14,
+  backgroundColor: COLORS.cream2,
+},
+
+coffeeProfileTitle: {
+  fontSize: 14,
+  fontWeight: "700",
+  color: COLORS.ink,
+  marginBottom: 10,
+},
+
+profileRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  paddingVertical: 5,
+},
+
+profileLabel: {
+  fontSize: 13,
+  color: COLORS.ink,
+},
+
+profileValue: {
+  fontSize: 13,
+  fontWeight: "700",
+  color: COLORS.rust,
+},
 });
