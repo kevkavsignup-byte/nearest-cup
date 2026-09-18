@@ -5,6 +5,14 @@ export type Tag =
   | "brunch"
   | "lunch";
 
+  export type CoffeeRating = {
+  shopId: string;
+  rating: number;
+  drinkType: string;
+  consistencyRating?: number;
+  createdAt: string;
+};
+
 export interface Shop {
   id: string;
   name: string;
@@ -107,27 +115,27 @@ function calculateNearestCupScore(
   filterScore: number
 ): number {
   const components = [
-    {
-      score: coffeeQualityScore,
-      weight: 0.4,
-    },
-    {
-      score: consistencyScore,
-      weight: 0.2,
-    },
-    {
-      score: milkDrinksScore,
-      weight: 0.15,
-    },
-    {
-      score: espressoScore,
-      weight: 0.15,
-    },
-    {
-      score: filterScore,
-      weight: 0.1,
-    },
-  ];
+  {
+    score: coffeeQualityScore,
+    weight: 0.4,
+  },
+  {
+    score: consistencyScore,
+    weight: 0.2,
+  },
+  {
+    score: milkDrinksScore,
+    weight: 0.15,
+  },
+  {
+    score: espressoScore,
+    weight: 0.15,
+  },
+  {
+    score: filterScore,
+    weight: 0.1,
+  },
+].filter((component) => component.score > 0);
 
   const available = components.filter(
     (component) => component.score > 0
@@ -597,29 +605,8 @@ export async function buildShops(
       } satisfies Shop;
     })
     .sort((a, b) => {
-      /*
-       * Cafés with genuine Nearest Cup
-       * scores will eventually rank here.
-       *
-       * For now all scores are zero, so
-       * review count provides the fallback
-       * ordering.
-       */
-      if (
-        b.nearestCupScore !==
-        a.nearestCupScore
-      ) {
-        return (
-          b.nearestCupScore -
-          a.nearestCupScore
-        );
-      }
-
-      return (
-        b.reviews -
-        a.reviews
-      );
-    });
+  return b.reviews - a.reviews;
+});
 }
 
 export interface Filters {
@@ -630,9 +617,127 @@ export interface Filters {
   favorites: Set<string>;
 }
 
+export function calculateShopCoffeeScores(
+  shopId: string,
+  ratings: CoffeeRating[]
+) {
+  const shopRatings = ratings.filter(
+    (rating) => rating.shopId === shopId
+  );
+
+  if (shopRatings.length === 0) {
+    return {
+      coffeeQualityScore: 0,
+      consistencyScore: 0,
+      milkDrinksScore: 0,
+      espressoScore: 0,
+      filterScore: 0,
+      coffeeQualityRatings: 0,
+      consistencyRatings: 0,
+      milkDrinksRatings: 0,
+      espressoRatings: 0,
+      filterRatings: 0,
+      nearestCupScore: 0,
+    };
+  }
+
+  const average = (items: CoffeeRating[]) => {
+    if (items.length === 0) return 0;
+
+    const total = items.reduce(
+      (sum, item) => sum + item.rating,
+      0
+    );
+
+    return Math.round(
+      (total / items.length) * 10
+    ) / 10;
+  };
+
+  const milkDrinks = shopRatings.filter(
+    (rating) =>
+      rating.drinkType === "Flat white" ||
+      rating.drinkType === "Cappuccino" ||
+      rating.drinkType === "Latte"
+  );
+
+  const espresso = shopRatings.filter(
+    (rating) => rating.drinkType === "Espresso"
+  );
+
+  const filter = shopRatings.filter(
+    (rating) => rating.drinkType === "Filter"
+  );
+
+  const coffeeQualityScore = average(shopRatings);
+
+const milkDrinksScore = average(milkDrinks);
+
+const espressoScore = average(espresso);
+
+const filterScore = average(filter);
+
+const consistencyRatings = shopRatings.filter(
+  (rating) =>
+    typeof rating.consistencyRating === "number" &&
+    rating.consistencyRating > 0
+);
+
+const consistencyScore =
+  consistencyRatings.length > 0
+    ? Math.round(
+        (
+          consistencyRatings.reduce(
+            (sum, rating) =>
+              sum + rating.consistencyRating!,
+            0
+          ) / consistencyRatings.length
+        ) * 10
+      ) / 10
+    : 0;
+
+  const components = [
+  { score: coffeeQualityScore, weight: 0.4 },
+  { score: consistencyScore, weight: 0.2 },
+  { score: milkDrinksScore, weight: 0.15 },
+  { score: espressoScore, weight: 0.15 },
+  { score: filterScore, weight: 0.1 },
+].filter((component) => component.score > 0);
+
+  const totalWeight = components.reduce(
+    (sum, component) => sum + component.weight,
+    0
+  );
+
+  const weightedScore =
+    components.length > 0
+      ? components.reduce(
+          (sum, component) =>
+            sum + component.score * component.weight,
+          0
+        ) / totalWeight
+      : 0;
+
+  return {
+    coffeeQualityScore,
+    consistencyScore,
+    milkDrinksScore,
+    espressoScore,
+    filterScore,
+    coffeeQualityRatings: shopRatings.length,
+    consistencyRatings: consistencyRatings.length,
+    milkDrinksRatings: milkDrinks.length,
+    espressoRatings: espresso.length,
+    filterRatings: filter.length,
+    nearestCupScore:
+      Math.round(weightedScore * 10) / 10,
+  };
+}
+
 export function filterAndRank(
   shops: Shop[],
-  f: Filters
+  f: Filters,
+  coffeeRatings: CoffeeRating[]
 ): Shop[] {
   return shops
     .filter(
@@ -656,34 +761,90 @@ export function filterAndRank(
         !f.favoritesOnly ||
         f.favorites.has(s.id)
     )
-    .sort((a, b) => {
+     .sort((a, b) => {
+      const aScores =
+        calculateShopCoffeeScores(
+          a.id,
+          coffeeRatings
+        );
+
+      const bScores =
+        calculateShopCoffeeScores(
+          b.id,
+          coffeeRatings
+        );
+
+      const NEUTRAL_SCORE = 3.5;
+      const CONFIDENCE_WEIGHT = 5;
+
+      const aAdjustedScore =
+        aScores.coffeeQualityRatings > 0
+          ? (
+              aScores.nearestCupScore *
+                aScores.coffeeQualityRatings +
+              NEUTRAL_SCORE *
+                CONFIDENCE_WEIGHT
+            ) /
+            (
+              aScores.coffeeQualityRatings +
+              CONFIDENCE_WEIGHT
+            )
+          : 0;
+
+      const bAdjustedScore =
+        bScores.coffeeQualityRatings > 0
+          ? (
+              bScores.nearestCupScore *
+                bScores.coffeeQualityRatings +
+              NEUTRAL_SCORE *
+                CONFIDENCE_WEIGHT
+            ) /
+            (
+              bScores.coffeeQualityRatings +
+              CONFIDENCE_WEIGHT
+            )
+          : 0;
+
+      const aHasNearestCup =
+        aScores.coffeeQualityRatings > 0;
+
+      const bHasNearestCup =
+        bScores.coffeeQualityRatings > 0;
+
+      if (
+        aHasNearestCup !==
+        bHasNearestCup
+      ) {
+        return aHasNearestCup ? -1 : 1;
+      }
+
+      if (
+        bAdjustedScore !==
+        aAdjustedScore
+      ) {
+        return (
+          bAdjustedScore -
+          aAdjustedScore
+        );
+      }
+
       const aGoogleScore =
         a.googleRating +
-        (Math.min(a.reviews, 500) / 500) * 0.2;
+        (Math.min(a.reviews, 500) / 500) *
+          0.2;
 
       const bGoogleScore =
         b.googleRating +
-        (Math.min(b.reviews, 500) / 500) * 0.2;
-
-      const aDistanceBonus =
-        Math.max(0, 5 - a.mins) * 0.02;
-
-      const bDistanceBonus =
-        Math.max(0, 5 - b.mins) * 0.02;
-
-      const aRecommendationScore =
-        aGoogleScore + aDistanceBonus;
-
-      const bRecommendationScore =
-        bGoogleScore + bDistanceBonus;
+        (Math.min(b.reviews, 500) / 500) *
+          0.2;
 
       if (
-        bRecommendationScore !==
-        aRecommendationScore
+        bGoogleScore !==
+        aGoogleScore
       ) {
         return (
-          bRecommendationScore -
-          aRecommendationScore
+          bGoogleScore -
+          aGoogleScore
         );
       }
 

@@ -14,44 +14,17 @@ import {
 } from "react-native";
 import {
   ALL_TAGS,
+  CoffeeRating,
   Shop,
   TAG_ICON,
   TAG_LABEL,
   Tag,
   buildShops,
+  calculateShopCoffeeScores,
   filterAndRank,
   starString,
 } from "../lib/shops";
 
-type CoffeeRating = {
-  shopId: string;
-  rating: number;
-  drinkType: string;
-  createdAt: string;
-};
-function calculateShopCoffeeScores(
-  shopId: string,
-  ratings: CoffeeRating[]
-) {
-  const shopRatings = ratings.filter(
-    (rating) => rating.shopId === shopId
-  );
-
-  if (shopRatings.length === 0) {
-    return {
-      coffeeQualityScore: 0,
-      consistencyScore: 0,
-      milkDrinksScore: 0,
-      espressoScore: 0,
-      filterScore: 0,
-      coffeeQualityRatings: 0,
-      consistencyRatings: 0,
-      milkDrinksRatings: 0,
-      espressoRatings: 0,
-      filterRatings: 0,
-      nearestCupScore: 0,
-    };
-  }
 
   const average = (items: CoffeeRating[]) => {
     if (items.length === 0) return 0;
@@ -66,77 +39,6 @@ function calculateShopCoffeeScores(
     ) / 10;
   };
 
-  const milkDrinks = shopRatings.filter(
-    (rating) =>
-      rating.drinkType === "Flat white" ||
-      rating.drinkType === "Cappuccino" ||
-      rating.drinkType === "Latte"
-  );
-
-  const espresso = shopRatings.filter(
-    (rating) => rating.drinkType === "Espresso"
-  );
-
-  const filter = shopRatings.filter(
-    (rating) => rating.drinkType === "Filter"
-  );
-
-  const coffeeQualityScore = average(shopRatings);
-  const milkDrinksScore = average(milkDrinks);
-  const espressoScore = average(espresso);
-  const filterScore = average(filter);
-
-  const components = [
-    {
-      score: coffeeQualityScore,
-      weight: 0.4,
-    },
-    {
-      score: milkDrinksScore,
-      weight: 0.15,
-    },
-    {
-      score: espressoScore,
-      weight: 0.15,
-    },
-    {
-      score: filterScore,
-      weight: 0.1,
-    },
-  ].filter((component) => component.score > 0);
-
-  const totalWeight = components.reduce(
-    (sum, component) => sum + component.weight,
-    0
-  );
-
-  const weightedScore =
-    components.length > 0
-      ? components.reduce(
-          (sum, component) =>
-            sum +
-            component.score * component.weight,
-          0
-        ) / totalWeight
-      : 0;
-
-  return {
-    coffeeQualityScore,
-    consistencyScore: 0,
-    milkDrinksScore,
-    espressoScore,
-    filterScore,
-
-    coffeeQualityRatings: shopRatings.length,
-    consistencyRatings: 0,
-    milkDrinksRatings: milkDrinks.length,
-    espressoRatings: espresso.length,
-    filterRatings: filter.length,
-
-    nearestCupScore:
-      Math.round(weightedScore * 10) / 10,
-  };
-}
 
 const COLORS = {
   cream: "#F3E9DC",
@@ -168,6 +70,7 @@ export default function Index() {
   const [ratingShop, setRatingShop] = useState<Shop | null>(null);
   const [coffeeRating, setCoffeeRating] = useState(0);
   const [drinkType, setDrinkType] = useState("");
+  const [consistencyRating, setConsistencyRating] = useState(0);
   
 useEffect(() => {
   const loadCoffeeRatings = async () => {
@@ -264,13 +167,17 @@ useEffect(() => {
     Linking.openURL(url);
   };
 
-  const ranked = filterAndRank(shops, {
+  const ranked = filterAndRank(
+  shops,
+  {
     maxMins,
     activeTags,
     requireOpen,
     favoritesOnly,
     favorites,
-  });
+  },
+  coffeeRatings
+);
 
   if (loading) {
     return (
@@ -872,6 +779,7 @@ useEffect(() => {
               "Latte",
               "Espresso",
               "Filter",
+              "Matcha",
               "Other",
             ].map((drink) => (
               <Pressable
@@ -896,6 +804,33 @@ useEffect(() => {
             ))}
           </View>
 
+          <Text style={styles.ratingQuestion}>
+  How consistent was the coffee?
+</Text>
+
+<Text style={styles.ratingHint}>
+  How reliably good do you expect the coffee to be here?
+</Text>
+
+<View style={styles.starRatingRow}>
+  {[1, 2, 3, 4, 5].map((star) => (
+    <Pressable
+      key={star}
+      onPress={() => setConsistencyRating(star)}
+    >
+      <Text
+        style={[
+          styles.ratingStar,
+          star <= consistencyRating &&
+            styles.ratingStarSelected,
+        ]}
+      >
+        ★
+      </Text>
+    </Pressable>
+  ))}
+</View>
+
           <Pressable
             onPress={async () => {
   if (!ratingShop || coffeeRating === 0 || !drinkType) {
@@ -906,6 +841,7 @@ useEffect(() => {
     shopId: ratingShop.id,
     rating: coffeeRating,
     drinkType,
+    consistencyRating,
     createdAt: new Date().toISOString(),
   };
 
@@ -930,6 +866,7 @@ useEffect(() => {
     setRatingShop(null);
     setCoffeeRating(0);
     setDrinkType("");
+    setConsistencyRating(0);
   } catch (error) {
     console.log("Could not save coffee rating:", error);
   }
