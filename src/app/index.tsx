@@ -437,15 +437,7 @@ useEffect(() => {
                 </Text>
               </Text>
 
-              <Text style={styles.stars}>
-                Google{""}
-                {starString(item.rating)}{" "}
-                <Text style={styles.ratingNum}>
-                  {item.rating.toFixed(1)}
-                </Text>
-              </Text>
-
-{calculateShopCoffeeScores(
+             {calculateShopCoffeeScores(
   item.id,
   coffeeRatings
 ).coffeeQualityRatings > 0 && (
@@ -468,6 +460,15 @@ useEffect(() => {
       : "ratings"}
   </Text>
 )}
+
+<Text style={styles.stars}>
+  Google{" "}
+  {starString(item.rating)}{" "}
+  <Text style={styles.ratingNum}>
+    {item.rating.toFixed(1)}
+  </Text>
+</Text>
+
 
               <View style={styles.infoRow}>
                 <Text
@@ -631,6 +632,52 @@ useEffect(() => {
   </View>
 )}
 
+<View style={styles.nearestCupScoreBox}>
+  <Text style={styles.scoreLabel}>
+    NEAREST CUP SCORE
+  </Text>
+
+  <Text style={styles.scoreValue}>
+    {calculateShopCoffeeScores(
+      selectedShop.id,
+      coffeeRatings
+    ).nearestCupScore > 0
+      ? calculateShopCoffeeScores(
+          selectedShop.id,
+          coffeeRatings
+        ).nearestCupScore.toFixed(1)
+      : "—"}
+  </Text>
+
+  <Text style={styles.scoreNote}>
+    {(() => {
+      const ratingCount =
+        calculateShopCoffeeScores(
+          selectedShop.id,
+          coffeeRatings
+        ).coffeeQualityRatings;
+
+      if (ratingCount === 0) {
+        return "No Nearest Cup ratings yet.";
+      }
+
+      let confidence = "Early signal";
+
+      if (ratingCount >= 10) {
+        confidence = "Established signal";
+      } else if (ratingCount >= 5) {
+        confidence = "Good signal";
+      } else if (ratingCount >= 2) {
+        confidence = "Emerging signal";
+      }
+
+      return `Based on ${ratingCount} Nearest Cup ${
+        ratingCount === 1 ? "rating" : "ratings"
+      }. ${confidence}.`;
+    })()}
+  </Text>
+</View>
+
 <View style={styles.scoreBox}>
   <Text style={styles.scoreLabel}>
     GOOGLE RATING
@@ -643,52 +690,6 @@ useEffect(() => {
   <Text style={styles.scoreNote}>
     Based on {selectedShop.reviews.toLocaleString()} Google reviews.
   </Text>
-</View>
-
-<View style={styles.nearestCupScoreBox}>
-  <Text style={styles.scoreLabel}>
-    NEAREST CUP SCORE
-  </Text>
-
-  <Text style={styles.scoreValue}>
-  {calculateShopCoffeeScores(
-    selectedShop.id,
-    coffeeRatings
-  ).nearestCupScore > 0
-    ? calculateShopCoffeeScores(
-        selectedShop.id,
-        coffeeRatings
-      ).nearestCupScore.toFixed(1)
-    : "—"}
-</Text>
-
-<Text style={styles.scoreNote}>
-  {(() => {
-    const ratingCount =
-      calculateShopCoffeeScores(
-        selectedShop.id,
-        coffeeRatings
-      ).coffeeQualityRatings;
-
-    if (ratingCount === 0) {
-      return "No Nearest Cup ratings yet.";
-    }
-
-    let confidence = "Early signal";
-
-    if (ratingCount >= 10) {
-      confidence = "Established signal";
-    } else if (ratingCount >= 5) {
-      confidence = "Good signal";
-    } else if (ratingCount >= 2) {
-      confidence = "Emerging signal";
-    }
-
-    return `Based on ${ratingCount} Nearest Cup ${
-      ratingCount === 1 ? "rating" : "ratings"
-    }. ${confidence}.`;
-  })()}
-</Text>
 </View>
 
 <View style={styles.detailActions}>
@@ -1455,7 +1456,8 @@ ratingHint: {
   marginTop: -4,
   marginBottom: 10,
   fontSize: 12,
-  color: COLORS.muted,
+  color: COLORS.ink,
+  opacity: 0.5,
 },
 
 starRatingRow: {
@@ -1552,7 +1554,7 @@ profileValue: {
 },
 nearestCupCardScore: {
   marginTop: 4,
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: "700",
   color: COLORS.rust,
 },
