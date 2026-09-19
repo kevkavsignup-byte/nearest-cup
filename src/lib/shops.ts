@@ -626,20 +626,32 @@ export function calculateShopCoffeeScores(
   );
 
   if (shopRatings.length === 0) {
-    return {
-      coffeeQualityScore: 0,
-      consistencyScore: 0,
-      milkDrinksScore: 0,
-      espressoScore: 0,
-      filterScore: 0,
-      coffeeQualityRatings: 0,
-      consistencyRatings: 0,
-      milkDrinksRatings: 0,
-      espressoRatings: 0,
-      filterRatings: 0,
-      nearestCupScore: 0,
-    };
-  }
+  return {
+    coffeeQualityScore: 0,
+    consistencyScore: 0,
+
+    flatWhiteScore: 0,
+    cappuccinoScore: 0,
+    latteScore: 0,
+
+    milkDrinksScore: 0,
+    espressoScore: 0,
+    filterScore: 0,
+
+    coffeeQualityRatings: 0,
+    consistencyRatings: 0,
+
+    flatWhiteRatings: 0,
+    cappuccinoRatings: 0,
+    latteRatings: 0,
+
+    milkDrinksRatings: 0,
+    espressoRatings: 0,
+    filterRatings: 0,
+
+    nearestCupScore: 0,
+  };
+}
 
   const average = (items: CoffeeRating[]) => {
     if (items.length === 0) return 0;
@@ -653,6 +665,21 @@ export function calculateShopCoffeeScores(
       (total / items.length) * 10
     ) / 10;
   };
+
+  const flatWhites = shopRatings.filter(
+  (rating) =>
+    rating.drinkType === "Flat white"
+);
+
+const cappuccinos = shopRatings.filter(
+  (rating) =>
+    rating.drinkType === "Cappuccino"
+);
+
+const lattes = shopRatings.filter(
+  (rating) =>
+    rating.drinkType === "Latte"
+);
 
   const milkDrinks = shopRatings.filter(
     (rating) =>
@@ -669,7 +696,13 @@ export function calculateShopCoffeeScores(
     (rating) => rating.drinkType === "Filter"
   );
 
-  const coffeeQualityScore = average(shopRatings);
+const coffeeQualityScore = average(shopRatings);
+
+const flatWhiteScore = average(flatWhites);
+
+const cappuccinoScore = average(cappuccinos);
+
+const latteScore = average(lattes);
 
 const milkDrinksScore = average(milkDrinks);
 
@@ -721,16 +754,292 @@ const consistencyScore =
   return {
     coffeeQualityScore,
     consistencyScore,
+    flatWhiteScore,
+    cappuccinoScore,
+    latteScore,
     milkDrinksScore,
     espressoScore,
     filterScore,
     coffeeQualityRatings: shopRatings.length,
     consistencyRatings: consistencyRatings.length,
+    flatWhiteRatings: flatWhites.length,
+    cappuccinoRatings: cappuccinos.length,
+    latteRatings: lattes.length,  
     milkDrinksRatings: milkDrinks.length,
     espressoRatings: espresso.length,
     filterRatings: filter.length,
     nearestCupScore:
       Math.round(weightedScore * 10) / 10,
+  };
+}
+
+export function calculateUserCoffeeProfile(
+  ratings: CoffeeRating[]
+) {
+  const average = (items: CoffeeRating[]) => {
+    if (items.length === 0) return 0;
+
+    const total = items.reduce(
+      (sum, item) => sum + item.rating,
+      0
+    );
+
+    return Math.round(
+      (total / items.length) * 10
+    ) / 10;
+  };
+
+  const flatWhites = ratings.filter(
+    (rating) =>
+      rating.drinkType === "Flat white"
+  );
+
+  const cappuccinos = ratings.filter(
+    (rating) =>
+      rating.drinkType === "Cappuccino"
+  );
+
+  const lattes = ratings.filter(
+    (rating) =>
+      rating.drinkType === "Latte"
+  );
+
+  const milkDrinks = ratings.filter(
+    (rating) =>
+      rating.drinkType === "Flat white" ||
+      rating.drinkType === "Cappuccino" ||
+      rating.drinkType === "Latte"
+  );
+
+  const espresso = ratings.filter(
+    (rating) =>
+      rating.drinkType === "Espresso"
+  );
+
+  const filter = ratings.filter(
+    (rating) =>
+      rating.drinkType === "Filter"
+  );
+
+  const consistencyRatings = ratings.filter(
+    (rating) =>
+      typeof rating.consistencyRating === "number" &&
+      rating.consistencyRating > 0
+  );
+
+  const consistencyScore =
+    consistencyRatings.length > 0
+      ? Math.round(
+          (
+            consistencyRatings.reduce(
+              (sum, rating) =>
+                sum + rating.consistencyRating!,
+              0
+            ) / consistencyRatings.length
+          ) * 10
+        ) / 10
+      : 0;
+
+  return {
+    totalRatings: ratings.length,
+
+    // Individual drink preferences
+    flatWhiteScore: average(flatWhites),
+    cappuccinoScore: average(cappuccinos),
+    latteScore: average(lattes),
+
+    flatWhiteRatings: flatWhites.length,
+    cappuccinoRatings: cappuccinos.length,
+    latteRatings: lattes.length,
+
+    // Existing broader preferences
+    milkDrinksScore: average(milkDrinks),
+    espressoScore: average(espresso),
+    filterScore: average(filter),
+    consistencyScore,
+
+    milkDrinksRatings: milkDrinks.length,
+    espressoRatings: espresso.length,
+    filterRatings: filter.length,
+    consistencyRatings: consistencyRatings.length,
+  };
+}
+
+export function calculatePersonalMatch(
+  shopScores: ReturnType<typeof calculateShopCoffeeScores>,
+  userProfile: ReturnType<typeof calculateUserCoffeeProfile>
+) {
+  const specificMatches = [
+    {
+      name: "flat whites",
+      shopScore: shopScores.flatWhiteScore,
+      shopRatings: shopScores.flatWhiteRatings,
+      userScore: userProfile.flatWhiteScore,
+      userRatings: userProfile.flatWhiteRatings,
+      weight: 0.4,
+    },
+    {
+      name: "cappuccinos",
+      shopScore: shopScores.cappuccinoScore,
+      shopRatings: shopScores.cappuccinoRatings,
+      userScore: userProfile.cappuccinoScore,
+      userRatings: userProfile.cappuccinoRatings,
+      weight: 0.2,
+    },
+    {
+      name: "lattes",
+      shopScore: shopScores.latteScore,
+      shopRatings: shopScores.latteRatings,
+      userScore: userProfile.latteScore,
+      userRatings: userProfile.latteRatings,
+      weight: 0.2,
+    },
+  ].filter(
+    (item) =>
+      item.shopScore > 0 &&
+      item.shopRatings >= 2 &&
+      item.userScore > 0 &&
+      item.userRatings >= 2
+  );
+
+  const broaderMatches = [
+    {
+      name: "espresso",
+      shopScore: shopScores.espressoScore,
+      shopRatings: shopScores.espressoRatings,
+      userScore: userProfile.espressoScore,
+      userRatings: userProfile.espressoRatings,
+      weight: 0.2,
+    },
+    {
+      name: "filter coffee",
+      shopScore: shopScores.filterScore,
+      shopRatings: shopScores.filterRatings,
+      userScore: userProfile.filterScore,
+      userRatings: userProfile.filterRatings,
+      weight: 0.2,
+    },
+    {
+      name: "consistency",
+      shopScore: shopScores.consistencyScore,
+      shopRatings: shopScores.consistencyRatings,
+      userScore: userProfile.consistencyScore,
+      userRatings: userProfile.consistencyRatings,
+      weight: 0.2,
+    },
+  ].filter(
+    (item) =>
+      item.shopScore > 0 &&
+      item.shopRatings >= 2 &&
+      item.userScore > 0 &&
+      item.userRatings >= 2
+  );
+
+  const matches = [
+    ...specificMatches,
+    ...broaderMatches,
+  ];
+
+  if (matches.length === 0) {
+    return {
+      score: 0,
+      reason: "Not enough coffee data yet.",
+    };
+  }
+
+  const adjustedMatches = matches.map(
+    (match) => {
+      const shopConfidence = Math.min(
+        match.shopRatings / 5,
+        1
+      );
+
+      const userConfidence = Math.min(
+        match.userRatings / 5,
+        1
+      );
+
+      const confidence =
+        shopConfidence * userConfidence;
+
+      const difference = Math.abs(
+        match.shopScore -
+          match.userScore
+      );
+
+      const matchScore = Math.max(
+        0,
+        5 - difference
+      );
+
+      return {
+        ...match,
+        confidence,
+        matchScore,
+      };
+    }
+  );
+
+  const totalWeight =
+    adjustedMatches.reduce(
+      (sum, match) =>
+        sum +
+        match.weight *
+          match.confidence,
+      0
+    );
+
+  if (totalWeight === 0) {
+    return {
+      score: 0,
+      reason: "Not enough coffee data yet.",
+    };
+  }
+
+  const weightedScore =
+    adjustedMatches.reduce(
+      (sum, match) =>
+        sum +
+        match.matchScore *
+          match.weight *
+          match.confidence,
+      0
+    ) / totalWeight;
+
+  const score =
+    Math.round(weightedScore * 10) / 10;
+
+  const strongestMatch =
+    [...adjustedMatches].sort(
+      (a, b) =>
+        b.matchScore *
+          b.weight *
+          b.confidence -
+        a.matchScore *
+          a.weight *
+          a.confidence
+    )[0];
+
+  const isSpecificDrink =
+    strongestMatch.name === "flat whites" ||
+    strongestMatch.name === "cappuccinos" ||
+    strongestMatch.name === "lattes";
+
+  let reason;
+
+  if (strongestMatch.shopScore >= strongestMatch.userScore) {
+    reason = isSpecificDrink
+      ? `Strong match for ${strongestMatch.name}.`
+      : `Strong match for ${strongestMatch.name}.`;
+  } else {
+    reason = isSpecificDrink
+      ? `Good match for ${strongestMatch.name}.`
+      : `Good match for ${strongestMatch.name}.`;
+  }
+
+  return {
+    score,
+    reason,
   };
 }
 

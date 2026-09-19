@@ -21,6 +21,8 @@ import {
   Tag,
   buildShops,
   calculateShopCoffeeScores,
+  calculateUserCoffeeProfile,
+  calculatePersonalMatch,
   filterAndRank,
   starString,
 } from "../lib/shops";
@@ -71,6 +73,25 @@ export default function Index() {
   const [coffeeRating, setCoffeeRating] = useState(0);
   const [drinkType, setDrinkType] = useState("");
   const [consistencyRating, setConsistencyRating] = useState(0);
+  const userCoffeeProfile = calculateUserCoffeeProfile(
+    coffeeRatings
+  );
+
+  const testShopScores = selectedShop
+  ? calculateShopCoffeeScores(
+      selectedShop.id,
+      coffeeRatings
+    )
+  : null;
+
+const personalMatch = testShopScores
+  ? calculatePersonalMatch(
+      testShopScores,
+      userCoffeeProfile
+    )
+  : 0;
+
+console.log("Personal match:", personalMatch);
   
 useEffect(() => {
   const loadCoffeeRatings = async () => {
@@ -80,8 +101,23 @@ useEffect(() => {
       );
 
       if (savedRatings) {
-        setCoffeeRatings(JSON.parse(savedRatings));
-      }
+  const parsedRatings = JSON.parse(savedRatings);
+
+  if (Array.isArray(parsedRatings)) {
+  const validRatings = parsedRatings.filter(
+    (rating) =>
+      rating &&
+      typeof rating.shopId === "string" &&
+      typeof rating.rating === "number" &&
+      rating.rating >= 1 &&
+      rating.rating <= 5 &&
+      typeof rating.drinkType === "string" &&
+      typeof rating.createdAt === "string"
+  );
+
+  setCoffeeRatings(validRatings);
+}
+}
     } catch (error) {
       console.log("Could not load coffee ratings:", error);
     }
@@ -336,37 +372,61 @@ useEffect(() => {
                 {item.name}
               </Text>
 
-              <Text style={styles.meta}>
-                {item.reviews} reviews ·{" "}
-                {"€".repeat(item.priceLevel)}
-                <Text style={{ opacity: 0.3 }}>
-                  {"€".repeat(3 - item.priceLevel)}
-                </Text>
-              </Text>
+          
+            {(() => {
+  const scores = calculateShopCoffeeScores(
+    item.id,
+    coffeeRatings
+  );
 
-             {calculateShopCoffeeScores(
-  item.id,
-  coffeeRatings
-).coffeeQualityRatings > 0 && (
-  <Text style={styles.nearestCupCardScore}>
-    Nearest Cup{" "}
-    {calculateShopCoffeeScores(
-      item.id,
-      coffeeRatings
-    ).nearestCupScore.toFixed(1)}{" "}
-    ·{" "}
-    {calculateShopCoffeeScores(
-      item.id,
-      coffeeRatings
-    ).coffeeQualityRatings}{" "}
-    {calculateShopCoffeeScores(
-      item.id,
-      coffeeRatings
-    ).coffeeQualityRatings === 1
-      ? "rating"
-      : "ratings"}
-  </Text>
-)}
+  if (scores.coffeeQualityRatings === 0) {
+    return null;
+  }
+
+  const ratingCount =
+    scores.coffeeQualityRatings;
+
+  let confidence = "First Sips";
+
+  if (ratingCount >= 10) {
+    confidence = "Well Tasted";
+  } else if (ratingCount >= 5) {
+    confidence = "A Solid Cup";
+  } else if (ratingCount >= 2) {
+    confidence = "Taking Shape";
+  }
+
+  const personalMatch =
+    calculatePersonalMatch(
+      scores,
+      userCoffeeProfile
+    );
+
+  return (
+    <>
+      <Text style={styles.nearestCupCardScore}>
+        ☕{" "}
+        {scores.nearestCupScore.toFixed(1)}
+        {" · "}
+        {confidence}
+      </Text>
+
+      {personalMatch.score > 0 && (
+        <Text
+          style={styles.personalMatchCardScore}
+        >
+          For You{" "}
+          {personalMatch.score.toFixed(1)}
+          {" · "}
+          {personalMatch.reason
+            .replace("Strong match for ", "")
+            .replace("Good match for ", "")
+            .replace(".", "")}
+        </Text>
+      )}
+    </>
+  );
+})()}
 
 <Text style={styles.stars}>
   Google{" "}
@@ -376,6 +436,13 @@ useEffect(() => {
   </Text>
 </Text>
 
+<Text style={styles.meta}>
+  {item.reviews.toLocaleString()} Google reviews ·{" "}
+  {"€".repeat(item.priceLevel)}
+  <Text style={{ opacity: 0.3 }}>
+    {"€".repeat(3 - item.priceLevel)}
+  </Text>
+</Text>
 
               <View style={styles.infoRow}>
                 <Text
@@ -544,60 +611,89 @@ useEffect(() => {
     NEAREST CUP SCORE
   </Text>
 
-  <Text style={styles.scoreValue}>
-    {calculateShopCoffeeScores(
+  {(() => {
+    const scores = calculateShopCoffeeScores(
       selectedShop.id,
       coffeeRatings
-    ).nearestCupScore > 0
-      ? calculateShopCoffeeScores(
-          selectedShop.id,
-          coffeeRatings
-        ).nearestCupScore.toFixed(1)
-      : "—"}
-  </Text>
+    );
 
-  <Text style={styles.scoreNote}>
+    const ratingCount = scores.coffeeQualityRatings;
+
+    let confidence = "First Sips";
+
+    if (ratingCount >= 10) {
+      confidence = "Well Tasted";
+    } else if (ratingCount >= 5) {
+      confidence = "A Solid Cup";
+    } else if (ratingCount >= 2) {
+      confidence = "Taking Shape";
+    }
+
+    return (
+      <>
+        <Text style={styles.scoreValue}>
+          {scores.nearestCupScore > 0
+            ? scores.nearestCupScore.toFixed(1)
+            : "—"}
+        </Text>
+
+        <Text style={styles.scoreNote}>
+          {ratingCount === 0
+            ? "No Nearest Cup ratings yet."
+            : `Based on ${ratingCount} Nearest Cup ${
+                ratingCount === 1 ? "rating" : "ratings"
+              }. ${confidence}.`}
+        </Text>
+
+        {ratingCount > 0 && (
+          <Text style={styles.scoreNote}>
+            Combines coffee quality, drink-specific ratings and consistency.
+          </Text>
+        )}
+      </>
+    );
+  })()}
+</View>
+{selectedShop && (
+  <View style={styles.personalMatchBox}>
+    <Text style={styles.scoreLabel}>
+      FOR YOU
+    </Text>
+
     {(() => {
-      const ratingCount =
-        calculateShopCoffeeScores(
-          selectedShop.id,
-          coffeeRatings
-        ).coffeeQualityRatings;
+      const shopScores = calculateShopCoffeeScores(
+        selectedShop.id,
+        coffeeRatings
+      );
 
-      if (ratingCount === 0) {
-        return "No Nearest Cup ratings yet.";
-      }
+      const match = calculatePersonalMatch(
+        shopScores,
+        userCoffeeProfile
+      );
 
-      let confidence = "Early signal";
+      return (
+        <>
+          <Text style={styles.scoreValue}>
+            {match.score > 0
+              ? match.score.toFixed(1)
+              : "—"}
+          </Text>
 
-      if (ratingCount >= 10) {
-        confidence = "Established signal";
-      } else if (ratingCount >= 5) {
-        confidence = "Good signal";
-      } else if (ratingCount >= 2) {
-        confidence = "Emerging signal";
-      }
+          <Text style={styles.scoreNote}>
+            {match.reason}
+          </Text>
 
-      return `Based on ${ratingCount} Nearest Cup ${
-        ratingCount === 1 ? "rating" : "ratings"
-      }. ${confidence}.`;
+          {match.score > 0 && (
+            <Text style={styles.scoreNote}>
+              Based on your coffee preferences and this café's ratings.
+            </Text>
+          )}
+        </>
+      );
     })()}
-  </Text>
-</View>
+  </View>
+)}
 
-<View style={styles.scoreBox}>
-  <Text style={styles.scoreLabel}>
-    GOOGLE RATING
-  </Text>
-
-  <Text style={styles.scoreValue}>
-    {selectedShop.googleRating.toFixed(1)}
-  </Text>
-
-  <Text style={styles.scoreNote}>
-    Based on {selectedShop.reviews.toLocaleString()} Google reviews.
-  </Text>
-</View>
 
 <View style={styles.detailActions}>
   <Pressable
@@ -655,6 +751,17 @@ useEffect(() => {
 
     return (
       <>
+      {scores.coffeeQualityRatings > 0 && (
+  <View style={styles.profileRow}>
+    <Text style={styles.profileLabel}>
+      Coffee quality
+    </Text>
+    <Text style={styles.profileValue}>
+      {scores.coffeeQualityScore.toFixed(1)}
+    </Text>
+  </View>
+)}
+
         {scores.milkDrinksRatings > 0 && (
           <View style={styles.profileRow}>
             <Text style={styles.profileLabel}>Milk drinks</Text>
@@ -696,11 +803,35 @@ useEffect(() => {
 </View>
 
 <Pressable
-  onPress={() => setRatingShop(selectedShop)}
+  onPress={() => {
+    if (!selectedShop) return;
+
+    const existingRating = coffeeRatings.find(
+      (rating) => rating.shopId === selectedShop.id
+    );
+
+    if (existingRating) {
+      setCoffeeRating(existingRating.rating);
+      setDrinkType(existingRating.drinkType);
+      setConsistencyRating(
+        existingRating.consistencyRating ?? 0
+      );
+    } else {
+      setCoffeeRating(0);
+      setDrinkType("");
+      setConsistencyRating(0);
+    }
+
+    setRatingShop(selectedShop);
+  }}
   style={styles.rateCoffeeBtn}
 >
   <Text style={styles.rateCoffeeText}>
-    ★ Rate this coffee
+    {coffeeRatings.some(
+      (rating) => rating.shopId === selectedShop?.id
+    )
+      ? "★ Update your rating"
+      : "★ Rate this coffee"}
   </Text>
 </Pressable>
                 </>
@@ -724,12 +855,12 @@ useEffect(() => {
         </Text>
 
         <Pressable
-          onPress={() => setRatingShop(null)}
-          style={styles.closeBtn}
-        >
-          <Text style={styles.closeText}>✕</Text>
-        </Pressable>
-      </View>
+  onPress={() => setRatingShop(null)}
+  style={styles.closeBtn}
+>
+  <Text style={styles.closeText}>✕</Text>
+</Pressable>
+</View>
 
       {ratingShop && (
         <>
@@ -833,9 +964,14 @@ useEffect(() => {
 
           <Pressable
             onPress={async () => {
-  if (!ratingShop || coffeeRating === 0 || !drinkType) {
-    return;
-  }
+  if (
+  !ratingShop ||
+  coffeeRating <= 0 ||
+  drinkType === "" ||
+  consistencyRating <= 0
+) {
+  return;
+}
 
   const newRating: CoffeeRating = {
     shopId: ratingShop.id,
@@ -854,7 +990,17 @@ useEffect(() => {
       ? JSON.parse(existingRatings)
       : [];
 
-    ratings.push(newRating);
+    const existingRatingIndex = ratings.findIndex(
+      (rating) => rating.shopId === newRating.shopId
+    );
+
+    if (existingRatingIndex >= 0) {
+  // Update existing rating for this café
+      ratings[existingRatingIndex] = newRating;
+    } else {
+  // First rating for this café
+      ratings.push(newRating);
+}
 
     await AsyncStorage.setItem(
       COFFEE_RATINGS_KEY,
@@ -871,11 +1017,13 @@ useEffect(() => {
     console.log("Could not save coffee rating:", error);
   }
 }}
-            style={[
-  styles.submitRatingBtn,
-  (coffeeRating === 0 || !drinkType) &&
-    styles.submitRatingBtnDisabled,
-]}
+style={[
+    styles.submitRatingBtn,
+    (coffeeRating <= 0 ||
+    drinkType === "" ||
+    consistencyRating <= 0) &&
+      styles.submitRatingBtnDisabled,
+  ]}
           >
             <Text style={styles.submitRatingText}>
               Submit rating
@@ -1031,6 +1179,7 @@ const styles = StyleSheet.create({
   },
 
   stars: {
+    marginTop: 6,
     color: COLORS.gold,
     fontSize: 13,
   },
@@ -1273,7 +1422,7 @@ const styles = StyleSheet.create({
   marginTop: 10,
   padding: 16,
   borderRadius: 14,
-  backgroundColor: COLORS.cream2,
+  backgroundColor: COLORS.cream,
   borderWidth: 0,
 },
 
@@ -1490,9 +1639,21 @@ profileValue: {
   color: COLORS.rust,
 },
 nearestCupCardScore: {
-  marginTop: 4,
-  fontSize: 13,
-  fontWeight: "700",
+  marginTop: 5,
+  fontSize: 15,
+  fontWeight: "800",
+  color: COLORS.espresso,
+},
+personalMatchCardScore: {
+  marginTop: 3,
+  fontSize: 12,
+  fontWeight: "600",
   color: COLORS.rust,
+},
+personalMatchBox: {
+  marginTop: 12,
+  padding: 16,
+  borderRadius: 12,
+  backgroundColor: COLORS.cream,
 },
 });
