@@ -53,6 +53,7 @@ export interface Shop {
 
   tags: Tag[];
   openNow: boolean;
+  closingTime?: string | null;
   wifi: boolean;
   hue: number;
 }
@@ -232,8 +233,11 @@ type GooglePlace = {
   priceLevel?: string;
 
   regularOpeningHours?: {
-    openNow?: boolean;
-  };
+  openNow?: boolean;
+  nextCloseTime?: string;
+  nextOpenTime?: string;
+  weekdayDescriptions?: string[];
+};
 
   types?: string[];
 
@@ -506,9 +510,12 @@ export async function buildShops(
         );
 
       const openNow =
-        place
-          .regularOpeningHours
-          ?.openNow ?? false;
+  place
+    .regularOpeningHours
+    ?.openNow ?? false;
+
+const closingTime =
+  place.regularOpeningHours?.nextCloseTime ?? null;
 
       return {
         id: place.id!,
@@ -595,6 +602,7 @@ export async function buildShops(
           tagsForPlace(place),
 
         openNow,
+        closingTime,
 
         wifi: false,
 

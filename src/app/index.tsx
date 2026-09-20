@@ -58,6 +58,19 @@ const WALK_OPTIONS = [10, 15, 20];
 const FAVORITES_KEY = "nearestcup:favorites";
 const COFFEE_RATINGS_KEY = "nearestCupCoffeeRatings";
 
+function formatClosingTime(
+  closingTime?: string | null
+) {
+  if (!closingTime) return null;
+
+  const date = new Date(closingTime);
+
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default function Index() {
   const [status, setStatus] = useState("Finding your location…");
   const [coffeeRatings, setCoffeeRatings] = useState<CoffeeRating[]>([]);
@@ -444,56 +457,61 @@ useEffect(() => {
   </Text>
 </Text>
 
-              <View style={styles.infoRow}>
-                <Text
-                  style={[
-                    styles.pill,
-                    item.openNow
-                      ? styles.pillOpen
-                      : styles.pillClosed,
-                  ]}
-                >
-                  {item.openNow ? "Open now" : "Closed"}
-                </Text>
+{item.openNow && item.closingTime && (
+  <Text style={styles.openingHours}>
+    Open · Closes{" "}
+    {formatClosingTime(item.closingTime)}
+  </Text>
+)}
 
-                {item.wifi && (
-                  <Text style={styles.pill}>
-                    📶 Wifi
-                  </Text>
-                )}
-              </View>
+             <View style={styles.actionRow}>
+  <Text
+    style={[
+      styles.pill,
+      item.openNow
+        ? styles.pillOpen
+        : styles.pillClosed,
+    ]}
+  >
+    {item.openNow ? "Open now" : "Closed"}
+  </Text>
 
-              <View style={styles.actionRow}>
-                <Pressable
-                  onPress={(event) => {
-                    event.stopPropagation();
-                    toggleFavorite(item.id);
-                  }}
-                  style={[
-                    styles.iconBtn,
-                    favorites.has(item.id) &&
-                      styles.iconBtnOn,
-                  ]}
-                >
-                  <Text>
-                    {favorites.has(item.id)
-                      ? "♥"
-                      : "♡"}
-                  </Text>
-                </Pressable>
+  {item.wifi && (
+    <Text style={styles.pill}>
+      📶 Wifi
+    </Text>
+  )}
 
-                <Pressable
-                  onPress={(event) => {
-                    event.stopPropagation();
-                    openDirections(item);
-                  }}
-                  style={styles.directionsBtn}
-                >
-                  <Text style={styles.directionsText}>
-                    Directions →
-                  </Text>
-                </Pressable>
-              </View>
+  <Pressable
+    onPress={(event) => {
+      event.stopPropagation();
+      toggleFavorite(item.id);
+    }}
+    style={[
+      styles.iconBtn,
+      favorites.has(item.id) &&
+        styles.iconBtnOn,
+    ]}
+  >
+    <Text>
+      {favorites.has(item.id)
+        ? "♥"
+        : "♡"}
+    </Text>
+  </Pressable>
+
+  <Pressable
+    onPress={(event) => {
+      event.stopPropagation();
+      openDirections(item);
+    }}
+    style={styles.directionsBtn}
+  >
+    <Text style={styles.directionsText}>
+      Directions →
+    </Text>
+  </Pressable>
+</View>
             </View>
 
             <View style={styles.cardRight}>
@@ -1180,6 +1198,7 @@ const styles = StyleSheet.create({
 
   stars: {
     marginTop: 6,
+
     color: COLORS.gold,
     fontSize: 13,
   },
@@ -1193,7 +1212,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
-    marginTop: 8,
+    alignItems: "center",
   },
 
   pill: {
@@ -1223,14 +1242,14 @@ const styles = StyleSheet.create({
   },
 
   iconBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  width: 30,
+  paddingVertical: 3,
+  borderRadius: 100,
+  borderWidth: 1,
+  borderColor: COLORS.line,
+  alignItems: "center",
+  justifyContent: "center",
+},
 
   iconBtnOn: {
     backgroundColor: COLORS.rust,
@@ -1238,17 +1257,17 @@ const styles = StyleSheet.create({
   },
 
   directionsBtn: {
-    height: 30,
-    paddingHorizontal: 11,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  paddingVertical: 3,
+  paddingHorizontal: 9,
+  borderRadius: 100,
+  borderWidth: 1,
+  borderColor: COLORS.line,
+  alignItems: "center",
+  justifyContent: "center",
+},
 
   directionsText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     color: COLORS.ink,
   },
@@ -1448,6 +1467,13 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 3,
   },
+
+  openingHours: {
+  marginTop: 4,
+  fontSize: 12,
+  fontWeight: "600",
+  color: COLORS.espresso,
+},
 
   detailActions: {
     flexDirection: "row",
