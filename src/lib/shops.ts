@@ -662,6 +662,7 @@ export function calculateShopCoffeeScores(
   };
 }
 
+
   const average = (items: CoffeeRating[]) => {
     if (items.length === 0) return 0;
 
@@ -782,6 +783,68 @@ const consistencyScore =
   };
 }
 
+export function getShopDrinkScore(
+  shopId: string,
+  drinkType: string,
+  coffeeRatings: CoffeeRating[]
+) {
+  const scores = calculateShopCoffeeScores(
+    shopId,
+    coffeeRatings
+  );
+
+  switch (drinkType) {
+    case "Flat white":
+      return scores.flatWhiteScore;
+
+    case "Cappuccino":
+      return scores.cappuccinoScore;
+
+    case "Latte":
+      return scores.latteScore;
+
+    case "Espresso":
+      return scores.espressoScore;
+
+    case "Filter":
+      return scores.filterScore;
+
+    default:
+      return 0;
+  }
+}
+
+export function getShopDrinkRatings(
+  shopId: string,
+  drinkType: string,
+  coffeeRatings: CoffeeRating[]
+) {
+  const scores = calculateShopCoffeeScores(
+    shopId,
+    coffeeRatings
+  );
+
+  switch (drinkType) {
+    case "Flat white":
+      return scores.flatWhiteRatings;
+
+    case "Cappuccino":
+      return scores.cappuccinoRatings;
+
+    case "Latte":
+      return scores.latteRatings;
+
+    case "Espresso":
+      return scores.espressoRatings;
+
+    case "Filter":
+      return scores.filterRatings;
+
+    default:
+      return 0;
+  }
+}
+
 export function calculateUserCoffeeProfile(
   ratings: CoffeeRating[]
 ) {
@@ -876,8 +939,71 @@ export function calculateUserCoffeeProfile(
 
 export function calculatePersonalMatch(
   shopScores: ReturnType<typeof calculateShopCoffeeScores>,
-  userProfile: ReturnType<typeof calculateUserCoffeeProfile>
+  userProfile: ReturnType<typeof calculateUserCoffeeProfile>,
+  activeDrinkType?: string | null
 ) {
+    if (activeDrinkType) {
+    const drinkMap = {
+      "Flat white": {
+        shopScore: shopScores.flatWhiteScore,
+        shopRatings: shopScores.flatWhiteRatings,
+        userScore: userProfile.flatWhiteScore,
+        userRatings: userProfile.flatWhiteRatings,
+      },
+      "Cappuccino": {
+        shopScore: shopScores.cappuccinoScore,
+        shopRatings: shopScores.cappuccinoRatings,
+        userScore: userProfile.cappuccinoScore,
+        userRatings: userProfile.cappuccinoRatings,
+      },
+      "Latte": {
+        shopScore: shopScores.latteScore,
+        shopRatings: shopScores.latteRatings,
+        userScore: userProfile.latteScore,
+        userRatings: userProfile.latteRatings,
+      },
+      "Espresso": {
+        shopScore: shopScores.espressoScore,
+        shopRatings: shopScores.espressoRatings,
+        userScore: userProfile.espressoScore,
+        userRatings: userProfile.espressoRatings,
+      },
+      "Filter": {
+        shopScore: shopScores.filterScore,
+        shopRatings: shopScores.filterRatings,
+        userScore: userProfile.filterScore,
+        userRatings: userProfile.filterRatings,
+      },
+    }[activeDrinkType];
+
+    if (
+      drinkMap &&
+      drinkMap.shopScore > 0 &&
+      drinkMap.shopRatings >= 2 &&
+      drinkMap.userScore > 0 &&
+      drinkMap.userRatings >= 2
+    ) {
+      const difference = Math.abs(
+        drinkMap.shopScore - drinkMap.userScore
+      );
+
+      const score =
+        Math.round(
+          Math.max(0, 5 - difference) * 10
+        ) / 10;
+
+      return {
+        score,
+        reason: `Good match for ${activeDrinkType}.`,
+      };
+    }
+
+    return {
+      score: 0,
+      reason: "Not enough coffee data yet.",
+    };
+  }
+  
   const specificMatches = [
     {
       name: "flat whites",
@@ -944,10 +1070,31 @@ export function calculatePersonalMatch(
       item.userRatings >= 2
   );
 
-  const matches = [
-    ...specificMatches,
-    ...broaderMatches,
-  ];
+    const selectedDrinkName =
+    activeDrinkType === "Flat white"
+      ? "flat whites"
+      : activeDrinkType === "Cappuccino"
+      ? "cappuccinos"
+      : activeDrinkType === "Latte"
+      ? "lattes"
+      : activeDrinkType === "Espresso"
+      ? "espresso"
+      : activeDrinkType === "Filter"
+      ? "filter coffee"
+      : null;
+
+const matches = selectedDrinkName
+  ? [
+      ...specificMatches,
+      ...broaderMatches,
+    ].filter(
+      (match) =>
+        match.name === selectedDrinkName
+    )
+  : [
+      ...specificMatches,
+      ...broaderMatches,
+    ];
 
   if (matches.length === 0) {
     return {
@@ -1126,6 +1273,92 @@ export function filterAndRank(
           b.id,
           coffeeRatings
         );
+
+        const aDrinkScore =
+  f.activeDrinkType
+    ? getShopDrinkScore(
+        a.id,
+        f.activeDrinkType,
+        coffeeRatings
+      )
+    : 0;
+
+const bDrinkScore =
+  f.activeDrinkType
+    ? getShopDrinkScore(
+        b.id,
+        f.activeDrinkType,
+        coffeeRatings
+      )
+    : 0;
+    console.log(
+  "DRINK SORT:",
+  f.activeDrinkType,
+  a.name,
+  aDrinkScore,
+  b.name,
+  bDrinkScore
+);
+
+const aDrinkRatings =
+  f.activeDrinkType
+    ? getShopDrinkRatings(
+        a.id,
+        f.activeDrinkType,
+        coffeeRatings
+      )
+    : 0;
+
+const bDrinkRatings =
+  f.activeDrinkType
+    ? getShopDrinkRatings(
+        b.id,
+        f.activeDrinkType,
+        coffeeRatings
+      )
+    : 0;
+
+    const aAdjustedDrinkScore =
+  aDrinkRatings > 0
+    ? (
+        aDrinkScore * aDrinkRatings +
+        3.5 * 5
+      ) /
+      (aDrinkRatings + 5)
+    : 0;
+
+const bAdjustedDrinkScore =
+  bDrinkRatings > 0
+    ? (
+        bDrinkScore * bDrinkRatings +
+        3.5 * 5
+      ) /
+      (bDrinkRatings + 5)
+    : 0;
+    if (f.activeDrinkType) {
+  const aHasDrinkRating =
+    aDrinkRatings > 0;
+
+  const bHasDrinkRating =
+    bDrinkRatings > 0;
+
+  if (
+    aHasDrinkRating !==
+    bHasDrinkRating
+  ) {
+    return aHasDrinkRating ? -1 : 1;
+  }
+
+  if (
+    bAdjustedDrinkScore !==
+    aAdjustedDrinkScore
+  ) {
+    return (
+      bAdjustedDrinkScore -
+      aAdjustedDrinkScore
+    );
+  }
+}
 
       const NEUTRAL_SCORE = 3.5;
       const CONFIDENCE_WEIGHT = 5;

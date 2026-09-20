@@ -20,9 +20,10 @@ import {
   TAG_LABEL,
   Tag,
   buildShops,
+  calculatePersonalMatch,
   calculateShopCoffeeScores,
   calculateUserCoffeeProfile,
-  calculatePersonalMatch,
+  getShopDrinkScore,
   filterAndRank,
   starString,
 } from "../lib/shops";
@@ -71,6 +72,14 @@ function formatClosingTime(
   });
 }
 
+const DRINK_TYPES = [
+  "Flat white",
+  "Cappuccino",
+  "Latte",
+  "Espresso",
+  "Filter",
+];
+
 export default function Index() {
   const [status, setStatus] = useState("Finding your location…");
   const [coffeeRatings, setCoffeeRatings] = useState<CoffeeRating[]>([]);
@@ -87,6 +96,14 @@ export default function Index() {
   const [ratingShop, setRatingShop] = useState<Shop | null>(null);
   const [coffeeRating, setCoffeeRating] = useState(0);
   const [drinkType, setDrinkType] = useState("");
+  const toggleDrinkType = useCallback(
+  (type: string) => {
+    setActiveDrinkType((current) =>
+      current === type ? "" : type
+    );
+  },
+  []
+);
   const [consistencyRating, setConsistencyRating] = useState(0);
   const userCoffeeProfile = calculateUserCoffeeProfile(
     coffeeRatings
@@ -99,12 +116,25 @@ export default function Index() {
     )
   : null;
 
+const selectedDrinkScore =
+  selectedShop && activeDrinkType
+    ? getShopDrinkScore(
+        selectedShop.id,
+        activeDrinkType,
+        coffeeRatings
+      )
+    : 0;
+
 const personalMatch = testShopScores
   ? calculatePersonalMatch(
       testShopScores,
-      userCoffeeProfile
+      userCoffeeProfile,
+      activeDrinkType
     )
-  : 0;
+  : {
+      score: 0,
+      reason: "Not enough coffee data yet.",
+    };
 
 console.log("Personal match:", personalMatch);
   
@@ -223,7 +253,7 @@ useEffect(() => {
   {
     maxMins,
     activeTags,
-    activeDrinkType,
+    activeDrinkType: activeDrinkType || null,
     requireOpen,
     favoritesOnly,
     favorites,
@@ -278,18 +308,21 @@ useEffect(() => {
         What you're after
       </Text>
 
-    <ScrollView
-  horizontal
-  showsHorizontalScrollIndicator={false}
+      <View
   style={{
-    marginBottom: 16,
+    height: 64,
+    marginBottom: 0,
     overflow: "visible",
   }}
-  contentContainerStyle={{
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingRight: 8,
-  }}
+>
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={{
+      alignItems: "center",
+      paddingHorizontal: 8,
+      paddingVertical: 12,
+    }}
 >
   {ALL_TAGS.map((tag) => (
     <Pressable
@@ -311,6 +344,46 @@ useEffect(() => {
     </Pressable>
   ))}
 </ScrollView>
+</View>
+
+<View style={{ 
+  height: 64, 
+  marginBottom:0, 
+  overflow: "visible" 
+  }}
+  >
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={{
+      alignItems: "center",
+      paddingHorizontal: 8,
+      paddingVertical: 12,
+    }}
+  >
+    {DRINK_TYPES.map((type) => (
+      <Pressable
+        key={type}
+        onPress={() => toggleDrinkType(type)}
+        style={[
+          styles.chip,
+          activeDrinkType === type &&
+            styles.chipTagActive,
+        ]}
+      >
+        <Text
+          style={[
+            styles.chipText,
+            activeDrinkType === type &&
+              styles.chipTextActive,
+          ]}
+        >
+          {type}
+        </Text>
+      </Pressable>
+    ))}
+  </ScrollView>
+</View>
 
       <View style={styles.row}>
         <Pressable
@@ -412,11 +485,12 @@ useEffect(() => {
     confidence = "Taking Shape";
   }
 
-  const personalMatch =
-    calculatePersonalMatch(
-      scores,
-      userCoffeeProfile
-    );
+ const personalMatch =
+  calculatePersonalMatch(
+    scores,
+    userCoffeeProfile,
+    activeDrinkType
+  );
 
   return (
     <>
@@ -427,19 +501,16 @@ useEffect(() => {
         {confidence}
       </Text>
 
-      {personalMatch.score > 0 && (
-        <Text
-          style={styles.personalMatchCardScore}
-        >
-          For You{" "}
-          {personalMatch.score.toFixed(1)}
-          {" · "}
-          {personalMatch.reason
-            .replace("Strong match for ", "")
-            .replace("Good match for ", "")
-            .replace(".", "")}
-        </Text>
-      )}
+     {personalMatch.score > 0 && (
+  <Text style={styles.personalMatchCardScore}>
+    For You{" "}
+    {personalMatch.score.toFixed(1)}
+    {" · "}
+    {activeDrinkType
+      ? activeDrinkType.toLowerCase() + "s"
+      : "coffee"}
+  </Text>
+)}
     </>
   );
 })()}
@@ -689,7 +760,8 @@ useEffect(() => {
 
       const match = calculatePersonalMatch(
         shopScores,
-        userCoffeeProfile
+        userCoffeeProfile,
+        activeDrinkType
       );
 
       return (
@@ -1173,6 +1245,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
+drinkTypeScroll: {
+  height: 56,
+  marginBottom: 8,
+},
+
+drinkTypeRow: {
+  gap: 12,
+  paddingRight: 32,
+  alignItems: "center",
+},
 
   cardMid: {
     flex: 1,
