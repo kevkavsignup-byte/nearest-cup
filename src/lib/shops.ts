@@ -620,6 +620,7 @@ const closingTime =
 export interface Filters {
   maxMins: number;
   activeTags: Set<Tag>;
+  activeDrinkType: string | null;
   requireOpen: boolean;
   favoritesOnly: boolean;
   favorites: Set<string>;
@@ -1062,17 +1063,52 @@ export function filterAndRank(
         s.mins <= f.maxMins
     )
     .filter(
-      (s) =>
-        f.activeTags.size === 0 ||
-        s.tags.some((t) =>
-          f.activeTags.has(t)
-        )
+  (s) =>
+    f.activeTags.size === 0 ||
+    s.tags.some((t) =>
+      f.activeTags.has(t)
     )
-    .filter(
-      (s) =>
-        !f.requireOpen ||
-        s.openNow
-    )
+)
+.filter(
+  (s) => {
+    if (!f.activeDrinkType) {
+      return true;
+    }
+
+    const scores =
+      calculateShopCoffeeScores(
+        s.id,
+        coffeeRatings
+      );
+
+    if (f.activeDrinkType === "Flat white") {
+      return scores.flatWhiteRatings > 0;
+    }
+
+    if (f.activeDrinkType === "Cappuccino") {
+      return scores.cappuccinoRatings > 0;
+    }
+
+    if (f.activeDrinkType === "Latte") {
+      return scores.latteRatings > 0;
+    }
+
+    if (f.activeDrinkType === "Espresso") {
+      return scores.espressoRatings > 0;
+    }
+
+    if (f.activeDrinkType === "Filter") {
+      return scores.filterRatings > 0;
+    }
+
+    return true;
+  }
+)
+.filter(
+  (s) =>
+    !f.requireOpen ||
+    s.openNow
+)
     .filter(
       (s) =>
         !f.favoritesOnly ||

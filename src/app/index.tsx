@@ -77,6 +77,8 @@ export default function Index() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [maxMins, setMaxMins] = useState(10);
   const [activeTags, setActiveTags] = useState<Set<Tag>>(new Set());
+  const [activeDrinkType, setActiveDrinkType] =
+  useState<string | null>(null);
   const [requireOpen, setRequireOpen] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -221,6 +223,7 @@ useEffect(() => {
   {
     maxMins,
     activeTags,
+    activeDrinkType,
     requireOpen,
     favoritesOnly,
     favorites,
