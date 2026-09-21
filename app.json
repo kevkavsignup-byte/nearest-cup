@@ -18,7 +18,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.anonymous.nearestcup"
     },
     "web": {
       "output": "static",
@@ -39,11 +43,23 @@
         {
           "locationWhenInUsePermission": "Nearest Cup uses your location to find coffee shops within walking distance."
         }
+      ],
+      [
+        "react-native-maps",
+        {
+          "androidGoogleMapsApiKey": "process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "decbd0c4-54e1-4a85-91cf-5f4dc5e8146f"
+      }
     }
   }
 }

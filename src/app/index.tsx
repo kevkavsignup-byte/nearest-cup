@@ -12,6 +12,12 @@ import {
   Text,
   View,
 } from "react-native";
+
+import MapView, {
+  Marker,
+  PROVIDER_GOOGLE,
+} from "react-native-maps";
+
 import {
   ALL_TAGS,
   CoffeeRating,
@@ -92,6 +98,11 @@ export default function Index() {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [userLocation, setUserLocation] = useState<{
+  latitude: number;
+  longitude: number;
+} | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [ratingShop, setRatingShop] = useState<Shop | null>(null);
   const [coffeeRating, setCoffeeRating] = useState(0);
@@ -191,6 +202,12 @@ useEffect(() => {
 
       try {
         const pos = await Location.getCurrentPositionAsync({});
+
+        setUserLocation({
+  latitude: pos.coords.latitude,
+  longitude: pos.coords.longitude,
+});
+
         setStatus("Finding cafés near you…");
 
         const nearbyShops = await buildShops(
@@ -279,6 +296,46 @@ useEffect(() => {
       </Text>
 
       <Text style={styles.status}>{status}</Text>
+
+      <View style={styles.viewToggle}>
+  <Pressable
+    onPress={() => setViewMode("list")}
+    style={[
+      styles.viewToggleButton,
+      viewMode === "list" &&
+        styles.viewToggleButtonActive,
+    ]}
+  >
+    <Text
+      style={[
+        styles.viewToggleText,
+        viewMode === "list" &&
+          styles.viewToggleTextActive,
+      ]}
+    >
+      List
+    </Text>
+  </Pressable>
+
+  <Pressable
+    onPress={() => setViewMode("map")}
+    style={[
+      styles.viewToggleButton,
+      viewMode === "map" &&
+        styles.viewToggleButtonActive,
+    ]}
+  >
+    <Text
+      style={[
+        styles.viewToggleText,
+        viewMode === "map" &&
+          styles.viewToggleTextActive,
+      ]}
+    >
+      Map
+    </Text>
+  </Pressable>
+</View>
 
       <Text style={styles.filterLabel}>Walk time</Text>
 
@@ -421,6 +478,65 @@ useEffect(() => {
         </Pressable>
       </View>
 
+{viewMode === "map" ? (
+  <View style={styles.mapContainer}>
+    {userLocation && (
+      <MapView
+        style={styles.map}
+        provider={PROVIDER_GOOGLE}
+        initialRegion={{
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          latitudeDelta: 0.03,
+          longitudeDelta: 0.03,
+        }}
+        showsUserLocation
+        showsMyLocationButton
+        mapType="standard"
+      >
+        {ranked.map((shop) => (
+          <Marker
+            key={shop.id}
+            coordinate={{
+              latitude: shop.lat,
+              longitude: shop.lng,
+            }}
+            title={shop.name}
+            description={`${shop.mins} min walk`}
+            onPress={() => setSelectedShop(shop)}
+          />
+        ))}
+      </MapView>
+    )}
+
+    {selectedShop && (
+    <View style={styles.mapPreview}>
+      <Text style={styles.mapPreviewName}>
+        {selectedShop.name}
+      </Text>
+
+      <Text style={styles.mapPreviewInfo}>
+        {selectedShop.mins} min walk
+        {" · "}
+        ☕{" "}
+        {calculateShopCoffeeScores(
+          selectedShop.id,
+          coffeeRatings
+        ).nearestCupScore.toFixed(1)}
+      </Text>
+
+      <Pressable
+        onPress={() => setSelectedShop(selectedShop)}
+        style={styles.mapPreviewButton}
+      >
+        <Text style={styles.mapPreviewButtonText}>
+          View café
+        </Text>
+      </Pressable>
+    </View>
+  )}
+  </View>
+) : (
       <FlatList
         data={ranked}
         keyExtractor={(item) => item.id}
@@ -600,6 +716,7 @@ useEffect(() => {
           </Pressable>
         )}
       />
+)}
 
       <Modal
         visible={selectedShop !== null}
@@ -1767,5 +1884,80 @@ personalMatchBox: {
   padding: 16,
   borderRadius: 12,
   backgroundColor: COLORS.cream,
+},
+
+viewToggle: {
+  flexDirection: "row",
+  alignSelf: "center",
+  marginBottom: 12,
+  borderRadius: 20,
+  overflow: "hidden",
+  borderWidth: 1,
+  borderColor: COLORS.line,
+},
+
+viewToggleButton: {
+  paddingHorizontal: 20,
+  paddingVertical: 8,
+},
+
+viewToggleButtonActive: {
+  backgroundColor: COLORS.espresso,
+},
+
+viewToggleText: {
+  color: COLORS.ink,
+  fontWeight: "600",
+},
+
+viewToggleTextActive: {
+  color: COLORS.cream,
+},
+
+mapContainer: {
+  flex: 1,
+  marginTop: 8,
+  overflow: "hidden",
+  borderRadius: 16,
+},
+
+map: {
+  flex: 1,
+},
+mapPreview: {
+  position: "absolute",
+  left: 12,
+  right: 12,
+  bottom: 12,
+  backgroundColor: COLORS.card,
+  borderRadius: 16,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: COLORS.line,
+},
+
+mapPreviewName: {
+  fontSize: 17,
+  fontWeight: "700",
+  color: COLORS.ink,
+},
+
+mapPreviewInfo: {
+  marginTop: 4,
+  color: COLORS.espresso,
+},
+
+mapPreviewButton: {
+  marginTop: 10,
+  alignSelf: "flex-start",
+  backgroundColor: COLORS.espresso,
+  borderRadius: 10,
+  paddingHorizontal: 14,
+  paddingVertical: 8,
+},
+
+mapPreviewButtonText: {
+  color: COLORS.cream,
+  fontWeight: "600",
 },
 });
