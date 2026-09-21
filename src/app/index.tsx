@@ -18,6 +18,8 @@ import MapView, {
   PROVIDER_GOOGLE,
 } from "react-native-maps";
 
+import { Ionicons } from "@expo/vector-icons";
+
 import {
   ALL_TAGS,
   CoffeeRating,
@@ -104,6 +106,9 @@ export default function Index() {
   longitude: number;
 } | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
+  const [selectedMarkerId, setSelectedMarkerId] =
+  useState<string | null>(null);
+  const [showMapCard, setShowMapCard] = useState(false);
   const [ratingShop, setRatingShop] = useState<Shop | null>(null);
   const [coffeeRating, setCoffeeRating] = useState(0);
   const [drinkType, setDrinkType] = useState("");
@@ -179,7 +184,7 @@ useEffect(() => {
     }
   };
 
-  loadCoffeeRatings();
+     loadCoffeeRatings();
 }, []);
 
   useEffect(() => {
@@ -276,6 +281,15 @@ useEffect(() => {
     favorites,
   },
   coffeeRatings
+);
+
+console.log(
+  "RANKED SHOPS:",
+  ranked.length,
+  ranked.map((shop) => ({
+    id: shop.id,
+    name: shop.name,
+  }))
 );
 
   if (loading) {
@@ -494,18 +508,37 @@ useEffect(() => {
         showsMyLocationButton
         mapType="standard"
       >
-        {ranked.map((shop) => (
-          <Marker
-            key={shop.id}
-            coordinate={{
-              latitude: shop.lat,
-              longitude: shop.lng,
-            }}
-            title={shop.name}
-            description={`${shop.mins} min walk`}
-            onPress={() => setSelectedShop(shop)}
-          />
-        ))}
+        {ranked.map((shop) => {
+  const isSelected = selectedMarkerId === shop.id;
+
+  return (
+    <Marker
+      key={shop.id}
+      coordinate={{
+        latitude: shop.lat,
+        longitude: shop.lng,
+      }}
+      onPress={() => {
+  setSelectedMarkerId(shop.id);
+  setSelectedShop(shop);
+}}
+      anchor={{ x: 0.5, y: 0.5 }}
+    >
+      <View
+        style={[
+          styles.mapMarker,
+          isSelected && styles.mapMarkerSelected,
+        ]}
+      >
+        <Ionicons
+          name="cafe-outline"
+          size={isSelected ? 22 : 18}
+          color="#33261D"
+        />
+      </View>
+    </Marker>
+  );
+})}
       </MapView>
     )}
 
@@ -1912,6 +1945,32 @@ viewToggleText: {
 
 viewToggleTextActive: {
   color: COLORS.cream,
+},
+
+mapMarker: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: "#F4EBDD",
+  borderWidth: 2,
+  borderColor: "#33261D",
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+mapMarkerSelected: {
+  width: 50,
+  height: 50,
+  borderRadius: 25,
+  backgroundColor: "#FFFFFF",
+  borderWidth: 3,
+  borderColor: "#33261D",
+},
+
+mapMarkerText: {
+  color: COLORS.espresso,
+  fontSize: 13,
+  fontWeight: "700",
 },
 
 mapContainer: {
