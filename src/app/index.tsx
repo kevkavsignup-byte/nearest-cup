@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -106,6 +106,14 @@ export default function Index() {
   longitude: number;
 } | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
+  const [mapRegion, setMapRegion] = useState({
+  latitude: 53.3498,
+  longitude: -6.2603,
+  latitudeDelta: 0.03,
+  longitudeDelta: 0.03,
+});
+  const mapRef = useRef<MapView>(null);
+  const [showMapFilters, setShowMapFilters] = useState(false);
   const [selectedMarkerId, setSelectedMarkerId] =
   useState<string | null>(null);
   const [showMapCard, setShowMapCard] = useState(false);
@@ -292,6 +300,64 @@ console.log(
   }))
 );
 
+const getClusteredShops = () => {
+  if (ranked.length === 0) {
+    return [];
+  }
+
+  const clusterRadius =
+  mapRegion.latitudeDelta * 0.04;
+
+  const clusters: Array<{
+    shops: typeof ranked;
+    latitude: number;
+    longitude: number;
+  }> = [];
+
+  for (const shop of ranked) {
+    const existingCluster = clusters.find((cluster) => {
+      const latitudeDifference = Math.abs(
+        shop.lat - cluster.latitude
+      );
+
+      const longitudeDifference = Math.abs(
+        shop.lng - cluster.longitude
+      );
+
+      return (
+        latitudeDifference < clusterRadius &&
+        longitudeDifference < clusterRadius
+      );
+    });
+
+    if (existingCluster) {
+      existingCluster.shops.push(shop);
+
+      existingCluster.latitude =
+        existingCluster.shops.reduce(
+          (total, item) => total + item.lat,
+          0
+        ) / existingCluster.shops.length;
+
+      existingCluster.longitude =
+        existingCluster.shops.reduce(
+          (total, item) => total + item.lng,
+          0
+        ) / existingCluster.shops.length;
+    } else {
+      clusters.push({
+        shops: [shop],
+        latitude: shop.lat,
+        longitude: shop.lng,
+      });
+    }
+  }
+
+  return clusters;
+};
+
+const clusteredShops = getClusteredShops();
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -351,7 +417,9 @@ console.log(
   </Pressable>
 </View>
 
-      <Text style={styles.filterLabel}>Walk time</Text>
+     {(viewMode === "list" || showMapFilters) && (
+  <>
+    <Text style={styles.filterLabel}>Walk time</Text>
 
       <View style={styles.row}>
         {WALK_OPTIONS.map((mins) => (
@@ -487,15 +555,18 @@ console.log(
               favoritesOnly && styles.chipTextActive,
             ]}
           >
-            Favourites
+              Favourites
           </Text>
         </Pressable>
       </View>
+  </>
+)}
 
 {viewMode === "map" ? (
   <View style={styles.mapContainer}>
     {userLocation && (
       <MapView
+        ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={{
@@ -504,60 +575,116 @@ console.log(
           latitudeDelta: 0.03,
           longitudeDelta: 0.03,
         }}
+        onRegionChangeComplete={setMapRegion}
         showsUserLocation
         showsMyLocationButton
         mapType="standard"
       >
-        {ranked.map((shop) => {
-  const isSelected = selectedMarkerId === shop.id;
+        {clusteredShops.map((cluster) => {
+  const isSingleShop = cluster.shops.length === 1;
+
+  if (isSingleShop) {
+    const shop = cluster.shops[0];
+    const isSelected = selectedMarkerId === shop.id;
+
+    return (
+      <Marker
+        key={shop.id}
+        coordinate={{
+          latitude: shop.lat,
+          longitude: shop.lng,
+        }}
+        onPress={() => {
+          setSelectedMarkerId(shop.id);
+          setSelectedShop(shop);
+        }}
+        anchor={{ x: 0.5, y: 0.5 }}
+      >
+        <View
+          style={[
+            styles.mapMarker,
+            isSelected && styles.mapMarkerSelected,
+          ]}
+        >
+          <Ionicons
+            name="cafe-outline"
+            size={isSelected ? 22 : 18}
+            color="#33261D"
+          />
+        </View>
+      </Marker>
+    );
+  }
 
   return (
     <Marker
-      key={shop.id}
+      key={`cluster-${cluster.shops
+        .map((item) => item.id)
+        .join("-")}`}
       coordinate={{
-        latitude: shop.lat,
-        longitude: shop.lng,
+        latitude: cluster.latitude,
+        longitude: cluster.longitude,
       }}
       onPress={() => {
-  setSelectedMarkerId(shop.id);
-  setSelectedShop(shop);
-}}
+        mapRef.current?.animateToRegion({
+          latitude: cluster.latitude,
+          longitude: cluster.longitude,
+          latitudeDelta: mapRegion.latitudeDelta / 3,
+          longitudeDelta: mapRegion.longitudeDelta / 3,
+      }, 400);
+      }}
       anchor={{ x: 0.5, y: 0.5 }}
     >
-      <View
-        style={[
-          styles.mapMarker,
-          isSelected && styles.mapMarkerSelected,
-        ]}
-      >
-        <Ionicons
-          name="cafe-outline"
-          size={isSelected ? 22 : 18}
-          color="#33261D"
-        />
+      <View style={styles.mapCluster}>
+        <Text style={styles.mapClusterText}>
+          {cluster.shops.length}
+        </Text>
       </View>
     </Marker>
   );
 })}
       </MapView>
-    )}
+)}
+
+      {viewMode === "map" && (
+        <Pressable
+          onPress={() => setShowMapFilters((value) => !value)}
+          style={styles.mapFiltersButton}
+        >
+          <Text style={styles.mapFiltersButtonText}>
+            {showMapFilters ? "Hide filters" : "Filters"}
+          </Text>
+        </Pressable>
+      )}
 
     {selectedShop && (
-    <View style={styles.mapPreview}>
-      <Text style={styles.mapPreviewName}>
-        {selectedShop.name}
-      </Text>
+  <View style={styles.mapPreview}>
+    <View style={styles.mapPreviewTopRow}>
+      <View style={styles.mapPreviewMain}>
+        <Text style={styles.mapPreviewName}>
+          {selectedShop.name}
+        </Text>
 
-      <Text style={styles.mapPreviewInfo}>
-        {selectedShop.mins} min walk
-        {" · "}
-        ☕{" "}
-        {calculateShopCoffeeScores(
-          selectedShop.id,
-          coffeeRatings
-        ).nearestCupScore.toFixed(1)}
-      </Text>
+        <Text style={styles.mapPreviewInfo}>
+          {selectedShop.mins} min walk
+          {" · "}
+          ☕{" "}
+          {calculateShopCoffeeScores(
+            selectedShop.id,
+            coffeeRatings
+          ).nearestCupScore.toFixed(1)}
+        </Text>
+      </View>
 
+      <Pressable
+        onPress={() => setSelectedShop(null)}
+        style={styles.mapPreviewClose}
+      >
+        <Text style={styles.mapPreviewCloseText}>✕</Text>
+      </Pressable>
+    </View>
+
+    <View style={styles.mapPreviewActions}>
       <Pressable
         onPress={() => setSelectedShop(selectedShop)}
         style={styles.mapPreviewButton}
@@ -567,7 +694,8 @@ console.log(
         </Text>
       </Pressable>
     </View>
-  )}
+  </View>
+)}
   </View>
 ) : (
       <FlatList
@@ -1967,6 +2095,23 @@ mapMarkerSelected: {
   borderColor: "#33261D",
 },
 
+mapCluster: {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  backgroundColor: "#FFFFFF",
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 2,
+  borderColor: "#33261D",
+},
+
+mapClusterText: {
+  fontSize: 14,
+  fontWeight: "700",
+  color: "#33261D",
+},
+
 mapMarkerText: {
   color: COLORS.espresso,
   fontSize: 13,
@@ -1993,6 +2138,61 @@ mapPreview: {
   padding: 14,
   borderWidth: 1,
   borderColor: COLORS.line,
+},
+
+mapPreviewTopRow: {
+  flexDirection: "row",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+},
+
+mapPreviewMain: {
+  flex: 1,
+  paddingRight: 12,
+},
+
+mapPreviewClose: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  backgroundColor: "#F4EBDD",
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+mapPreviewCloseText: {
+  fontSize: 16,
+  color: "#33261D",
+  fontWeight: "600",
+},
+
+mapPreviewActions: {
+  marginTop: 14,
+},
+
+mapFiltersButton: {
+  position: "absolute",
+  top: 16,
+  right: 16,
+  backgroundColor: "#FFFFFF",
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  borderRadius: 22,
+  borderWidth: 1,
+  borderColor: "#33261D",
+  elevation: 3,
+  shadowOpacity: 0.15,
+  shadowRadius: 4,
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+},
+
+mapFiltersButtonText: {
+  color: "#33261D",
+  fontSize: 14,
+  fontWeight: "600",
 },
 
 mapPreviewName: {
