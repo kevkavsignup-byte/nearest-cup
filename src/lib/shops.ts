@@ -992,10 +992,19 @@ export function calculatePersonalMatch(
           Math.max(0, 5 - difference) * 10
         ) / 10;
 
-      return {
-        score,
-        reason: `Good match for ${activeDrinkType}.`,
-      };
+      const closeness =
+  difference <= 0.2
+    ? "Very close to your"
+    : difference <= 0.5
+    ? "Close to your"
+    : "Similar to your";
+
+return {
+  score,
+  reason: `${closeness} ${activeDrinkType.toLowerCase()} preference. Café ${drinkMap.shopScore.toFixed(
+    1
+  )} · You ${drinkMap.userScore.toFixed(1)}`,
+};
     }
 
     return {
@@ -1181,17 +1190,20 @@ const matches = selectedDrinkName
     strongestMatch.name === "cappuccinos" ||
     strongestMatch.name === "lattes";
 
-  let reason;
+  const difference = Math.abs(
+  strongestMatch.shopScore -
+    strongestMatch.userScore
+);
 
-  if (strongestMatch.shopScore >= strongestMatch.userScore) {
-    reason = isSpecificDrink
-      ? `Strong match for ${strongestMatch.name}.`
-      : `Strong match for ${strongestMatch.name}.`;
-  } else {
-    reason = isSpecificDrink
-      ? `Good match for ${strongestMatch.name}.`
-      : `Good match for ${strongestMatch.name}.`;
-  }
+let reason;
+
+if (difference <= 0.2) {
+  reason = `Very close to your ${strongestMatch.name} preference.`;
+} else if (difference <= 0.5) {
+  reason = `Close to your ${strongestMatch.name} preference.`;
+} else {
+  reason = `Similar to your ${strongestMatch.name} preference.`;
+}
 
   return {
     score,
@@ -1291,14 +1303,7 @@ const bDrinkScore =
         coffeeRatings
       )
     : 0;
-    console.log(
-  "DRINK SORT:",
-  f.activeDrinkType,
-  a.name,
-  aDrinkScore,
-  b.name,
-  bDrinkScore
-);
+
 
 const aDrinkRatings =
   f.activeDrinkType
