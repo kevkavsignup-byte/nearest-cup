@@ -358,6 +358,33 @@ const getClusteredShops = () => {
 
 const clusteredShops = getClusteredShops();
 
+const fitMapToShops = () => {
+  if (!mapRef.current || !userLocation || clusteredShops.length === 0) {
+    return;
+  }
+
+  const coordinates = [
+    {
+      latitude: userLocation.latitude,
+      longitude: userLocation.longitude,
+    },
+    ...clusteredShops.map((cluster) => ({
+      latitude: cluster.latitude,
+      longitude: cluster.longitude,
+    })),
+  ];
+
+  mapRef.current.fitToCoordinates(coordinates, {
+    edgePadding: {
+      top: 100,
+      right: 50,
+      bottom: 180,
+      left: 50,
+    },
+    animated: true,
+  });
+};
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -580,6 +607,7 @@ const clusteredShops = getClusteredShops();
         showsUserLocation
         showsMyLocationButton
         mapType="standard"
+        onMapReady={fitMapToShops}
       >
         {clusteredShops.map((cluster) => {
   const isSingleShop = cluster.shops.length === 1;
@@ -2121,14 +2149,22 @@ viewToggleTextActive: {
 },
 
 mapMarker: {
-  width: 40,
-  height: 40,
-  borderRadius: 20,
+  width: 42,
+  height: 42,
+  borderRadius: 21,
   backgroundColor: "#F4EBDD",
   borderWidth: 2,
   borderColor: "#33261D",
   alignItems: "center",
   justifyContent: "center",
+  shadowColor: "#000",
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.15,
+  shadowRadius: 3,
+  elevation: 3,
 },
 
 mapMarkerSelected: {
@@ -2138,6 +2174,14 @@ mapMarkerSelected: {
   backgroundColor: "#FFFFFF",
   borderWidth: 3,
   borderColor: "#33261D",
+  shadowColor: "#000",
+  shadowOffset: {
+    width: 0,
+    height: 3,
+  },
+  shadowOpacity: 0.2,
+  shadowRadius: 4,
+  elevation: 5,
 },
 
 mapCluster: {
@@ -2150,6 +2194,14 @@ mapCluster: {
   justifyContent: "center",
   borderWidth: 2,
   borderColor: "#33261D",
+  shadowColor: "#000",
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.15,
+  shadowRadius: 3,
+  elevation: 3,
 },
 
 mapClusterNumber: {
@@ -2219,14 +2271,15 @@ mapPreviewMain: {
 },
 mapPreviewName: {
   color: COLORS.ink,
-  fontSize: 20,
+  fontSize: 19,
   fontWeight: "700",
+  lineHeight: 23,
 },
 
 mapPreviewInfo: {
   marginTop: 5,
   color: COLORS.espresso,
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: "600",
 },
 
@@ -2304,7 +2357,7 @@ mapPreviewButton: {
   flex: 1,
   backgroundColor: COLORS.espresso,
   borderRadius: 12,
-  paddingVertical: 13,
+  paddingVertical: 14,
   alignItems: "center",
 },
 
@@ -2318,7 +2371,7 @@ mapPreviewButtonSecondary: {
   flex: 1,
   backgroundColor: COLORS.cream2,
   borderRadius: 12,
-  paddingVertical: 13,
+  paddingVertical: 14,
   alignItems: "center",
 },
 
