@@ -31,8 +31,8 @@ import {
   calculatePersonalMatch,
   calculateShopCoffeeScores,
   calculateUserCoffeeProfile,
-  getShopDrinkScore,
   filterAndRank,
+  getShopDrinkScore,
   starString,
 } from "../lib/shops";
 
@@ -106,6 +106,7 @@ export default function Index() {
   longitude: number;
 } | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
+  const [showCafeDetails, setShowCafeDetails] = useState(false);
   const [mapRegion, setMapRegion] = useState({
   latitude: 53.3498,
   longitude: -6.2603,
@@ -116,7 +117,6 @@ export default function Index() {
   const [showMapFilters, setShowMapFilters] = useState(false);
   const [selectedMarkerId, setSelectedMarkerId] =
   useState<string | null>(null);
-  const [showMapCard, setShowMapCard] = useState(false);
   const [ratingShop, setRatingShop] = useState<Shop | null>(null);
   const [coffeeRating, setCoffeeRating] = useState(0);
   const [drinkType, setDrinkType] = useState("");
@@ -564,6 +564,7 @@ const clusteredShops = getClusteredShops();
 
 {viewMode === "map" ? (
   <View style={styles.mapContainer}>
+
     {userLocation && (
       <MapView
         ref={mapRef}
@@ -636,26 +637,28 @@ const clusteredShops = getClusteredShops();
       anchor={{ x: 0.5, y: 0.5 }}
     >
       <View style={styles.mapCluster}>
-        <Text style={styles.mapClusterText}>
-          {cluster.shops.length}
-        </Text>
-      </View>
+  <Text style={styles.mapClusterNumber}>
+    {cluster.shops.length}
+  </Text>
+  <Text style={styles.mapClusterLabel}>
+    cafés
+  </Text>
+</View>
     </Marker>
   );
 })}
       </MapView>
 )}
 
-      {viewMode === "map" && (
-        <Pressable
-          onPress={() => setShowMapFilters((value) => !value)}
-          style={styles.mapFiltersButton}
-        >
-          <Text style={styles.mapFiltersButtonText}>
-            {showMapFilters ? "Hide filters" : "Filters"}
-          </Text>
-        </Pressable>
-      )}
+
+    <Pressable
+  style={styles.mapFiltersButton}
+  onPress={() => setShowMapFilters((value) => !value)}
+>
+  <Text style={styles.mapFiltersButtonText}>
+    {showMapFilters ? "Hide filters" : "Filters"}
+  </Text>
+</Pressable>
 
     {selectedShop && (
   <View style={styles.mapPreview}>
@@ -666,13 +669,13 @@ const clusteredShops = getClusteredShops();
         </Text>
 
         <Text style={styles.mapPreviewInfo}>
-          {selectedShop.mins} min walk
-          {" · "}
-          ☕{" "}
+          ⭐{" "}
           {calculateShopCoffeeScores(
             selectedShop.id,
             coffeeRatings
           ).nearestCupScore.toFixed(1)}
+          {"  ·  "}
+          {selectedShop.mins} min walk
         </Text>
       </View>
 
@@ -680,15 +683,46 @@ const clusteredShops = getClusteredShops();
         onPress={() => setSelectedShop(null)}
         style={styles.mapPreviewClose}
       >
-        <Text style={styles.mapPreviewCloseText}>✕</Text>
+        <Text style={styles.mapPreviewCloseText}>
+          ✕
+        </Text>
       </Pressable>
     </View>
 
+    {activeDrinkType && (
+      <View style={styles.mapPreviewDrinkRow}>
+        <Text style={styles.mapPreviewDrinkName}>
+          {activeDrinkType}
+        </Text>
+
+        <Text style={styles.mapPreviewDrinkScore}>
+          ★{" "}
+          {getShopDrinkScore(
+            selectedShop.id,
+            activeDrinkType,
+            coffeeRatings
+          ).toFixed(1)}
+        </Text>
+      </View>
+    )}
+
     <View style={styles.mapPreviewActions}>
       <Pressable
-        onPress={() => setSelectedShop(selectedShop)}
-        style={styles.mapPreviewButton}
+        onPress={() => openDirections(selectedShop)}
+        style={styles.mapPreviewButtonSecondary}
       >
+        <Text style={styles.mapPreviewButtonSecondaryText}>
+          Directions
+        </Text>
+      </Pressable>
+
+      <Pressable
+  onPress={() => {
+    if (!selectedShop) return;
+    setShowCafeDetails(true);
+  }}
+  style={styles.mapPreviewButton}
+>
         <Text style={styles.mapPreviewButtonText}>
           View café
         </Text>
@@ -714,7 +748,10 @@ const clusteredShops = getClusteredShops();
         renderItem={({ item, index }) => (
           <Pressable
             style={styles.card}
-            onPress={() => setSelectedShop(item)}
+            onPress={() => {
+  setSelectedShop(item);
+  setShowCafeDetails(true);
+}}
           >
             <View
               style={[
@@ -879,11 +916,16 @@ const clusteredShops = getClusteredShops();
       />
 )}
 
+console.log("MODAL SECTION REACHED");
+
       <Modal
-        visible={selectedShop !== null}
+  visible={selectedShop !== null && showCafeDetails}
         animationType="slide"
         transparent
-        onRequestClose={() => setSelectedShop(null)}
+        onRequestClose={() => {
+  setShowCafeDetails(false);
+  setSelectedShop(null);
+}}
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.detailCard}>
@@ -899,7 +941,10 @@ const clusteredShops = getClusteredShops();
                   </Text>
 
                   <Pressable
-                    onPress={() => setSelectedShop(null)}
+                    onPress={() => {
+  setShowCafeDetails(false);
+  setSelectedShop(null);
+}}
                     style={styles.closeBtn}
                   >
                     <Text style={styles.closeText}>
@@ -2096,14 +2141,29 @@ mapMarkerSelected: {
 },
 
 mapCluster: {
-  width: 42,
-  height: 42,
-  borderRadius: 21,
+  minWidth: 48,
+  height: 48,
+  paddingHorizontal: 6,
+  borderRadius: 24,
   backgroundColor: "#FFFFFF",
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 2,
   borderColor: "#33261D",
+},
+
+mapClusterNumber: {
+  fontSize: 15,
+  fontWeight: "700",
+  lineHeight: 17,
+  color: "#33261D",
+},
+
+mapClusterLabel: {
+  fontSize: 8,
+  fontWeight: "600",
+  lineHeight: 9,
+  color: "#33261D",
 },
 
 mapClusterText: {
@@ -2128,52 +2188,97 @@ mapContainer: {
 map: {
   flex: 1,
 },
+
 mapPreview: {
   position: "absolute",
-  left: 12,
-  right: 12,
-  bottom: 12,
+  left: 16,
+  right: 16,
+  bottom: 16,
   backgroundColor: COLORS.card,
-  borderRadius: 16,
-  padding: 14,
+  borderRadius: 22,
+  padding: 18,
   borderWidth: 1,
   borderColor: COLORS.line,
+  shadowColor: "#000",
+  shadowOpacity: 0.18,
+  shadowRadius: 10,
+  shadowOffset: {
+    width: 0,
+    height: 4,
+  },
+  elevation: 8,
 },
 
 mapPreviewTopRow: {
   flexDirection: "row",
   alignItems: "flex-start",
-  justifyContent: "space-between",
 },
 
 mapPreviewMain: {
   flex: 1,
-  paddingRight: 12,
+},
+mapPreviewName: {
+  color: COLORS.ink,
+  fontSize: 20,
+  fontWeight: "700",
+},
+
+mapPreviewInfo: {
+  marginTop: 5,
+  color: COLORS.espresso,
+  fontSize: 14,
+  fontWeight: "600",
 },
 
 mapPreviewClose: {
   width: 32,
   height: 32,
   borderRadius: 16,
-  backgroundColor: "#F4EBDD",
   alignItems: "center",
   justifyContent: "center",
+  backgroundColor: COLORS.cream2,
 },
 
 mapPreviewCloseText: {
+  color: COLORS.espresso,
   fontSize: 16,
-  color: "#33261D",
+  fontWeight: "700",
+},
+
+mapPreviewDrinkRow: {
+  marginTop: 16,
+  paddingTop: 12,
+  paddingBottom: 12,
+  paddingHorizontal: 12,
+  borderRadius: 12,
+  backgroundColor: COLORS.cream2,
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+},
+
+mapPreviewDrinkName: {
+  color: COLORS.ink,
+  fontSize: 14,
   fontWeight: "600",
 },
 
+mapPreviewDrinkScore: {
+  color: COLORS.espresso,
+  fontSize: 14,
+  fontWeight: "700",
+},
+
 mapPreviewActions: {
-  marginTop: 14,
+  flexDirection: "row",
+  gap: 10,
+  marginTop: 16,
 },
 
 mapFiltersButton: {
   position: "absolute",
-  top: 16,
-  right: 16,
+  top: 28,
+  left: 28,
   backgroundColor: "#FFFFFF",
   paddingHorizontal: 16,
   paddingVertical: 10,
@@ -2195,28 +2300,31 @@ mapFiltersButtonText: {
   fontWeight: "600",
 },
 
-mapPreviewName: {
-  fontSize: 17,
-  fontWeight: "700",
-  color: COLORS.ink,
-},
-
-mapPreviewInfo: {
-  marginTop: 4,
-  color: COLORS.espresso,
-},
-
 mapPreviewButton: {
-  marginTop: 10,
-  alignSelf: "flex-start",
+  flex: 1,
   backgroundColor: COLORS.espresso,
-  borderRadius: 10,
-  paddingHorizontal: 14,
-  paddingVertical: 8,
+  borderRadius: 12,
+  paddingVertical: 13,
+  alignItems: "center",
 },
 
 mapPreviewButtonText: {
   color: COLORS.cream,
-  fontWeight: "600",
+  fontSize: 14,
+  fontWeight: "700",
+},
+
+mapPreviewButtonSecondary: {
+  flex: 1,
+  backgroundColor: COLORS.cream2,
+  borderRadius: 12,
+  paddingVertical: 13,
+  alignItems: "center",
+},
+
+mapPreviewButtonSecondaryText: {
+  color: COLORS.espresso,
+  fontSize: 14,
+  fontWeight: "700",
 },
 });
