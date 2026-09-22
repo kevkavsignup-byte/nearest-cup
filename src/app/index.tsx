@@ -36,21 +36,6 @@ import {
   starString,
 } from "../lib/shops";
 
-
-  const average = (items: CoffeeRating[]) => {
-    if (items.length === 0) return 0;
-
-    const total = items.reduce(
-      (sum, item) => sum + item.rating,
-      0
-    );
-
-    return Math.round(
-      (total / items.length) * 10
-    ) / 10;
-  };
-
-
 const COLORS = {
   cream: "#F3E9DC",
   cream2: "#EADFCE",
@@ -132,35 +117,6 @@ export default function Index() {
   const userCoffeeProfile = calculateUserCoffeeProfile(
     coffeeRatings
   );
-
-  const testShopScores = selectedShop
-  ? calculateShopCoffeeScores(
-      selectedShop.id,
-      coffeeRatings
-    )
-  : null;
-
-const selectedDrinkScore =
-  selectedShop && activeDrinkType
-    ? getShopDrinkScore(
-        selectedShop.id,
-        activeDrinkType,
-        coffeeRatings
-      )
-    : 0;
-
-const personalMatch = testShopScores
-  ? calculatePersonalMatch(
-      testShopScores,
-      userCoffeeProfile,
-      activeDrinkType
-    )
-  : {
-      score: 0,
-      reason: "Not enough coffee data yet.",
-    };
-
-console.log("Personal match:", personalMatch);
   
 useEffect(() => {
   const loadCoffeeRatings = async () => {
@@ -289,15 +245,6 @@ useEffect(() => {
     favorites,
   },
   coffeeRatings
-);
-
-console.log(
-  "RANKED SHOPS:",
-  ranked.length,
-  ranked.map((shop) => ({
-    id: shop.id,
-    name: shop.name,
-  }))
 );
 
 const getClusteredShops = () => {
@@ -944,7 +891,6 @@ const fitMapToShops = () => {
       />
 )}
 
-console.log("MODAL SECTION REACHED");
 
       <Modal
   visible={selectedShop !== null && showCafeDetails}
@@ -1597,17 +1543,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-drinkTypeScroll: {
-  height: 56,
-  marginBottom: 8,
-},
-
-drinkTypeRow: {
-  gap: 12,
-  paddingRight: 32,
-  alignItems: "center",
-},
-
   cardMid: {
     flex: 1,
   },
@@ -1865,13 +1800,6 @@ drinkTypeRow: {
     color: COLORS.ink,
     fontSize: 14,
     lineHeight: 20,
-  },
-
-  scoreBox: {
-    marginTop: 18,
-    padding: 16,
-    borderRadius: 14,
-    backgroundColor: COLORS.cream2,
   },
 
   nearestCupScoreBox: {
@@ -2216,18 +2144,6 @@ mapClusterLabel: {
   fontWeight: "600",
   lineHeight: 9,
   color: "#33261D",
-},
-
-mapClusterText: {
-  fontSize: 14,
-  fontWeight: "700",
-  color: "#33261D",
-},
-
-mapMarkerText: {
-  color: COLORS.espresso,
-  fontSize: 13,
-  fontWeight: "700",
 },
 
 mapContainer: {

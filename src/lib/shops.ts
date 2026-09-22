@@ -115,6 +115,7 @@ function calculateNearestCupScore(
   espressoScore: number,
   filterScore: number
 ): number {
+  
   const components = [
   {
     score: coffeeQualityScore,
@@ -138,27 +139,21 @@ function calculateNearestCupScore(
   },
 ].filter((component) => component.score > 0);
 
-  const available = components.filter(
-    (component) => component.score > 0
-  );
+  if (components.length === 0) {
+  return 0;
+}
 
-  if (available.length === 0) {
-    return 0;
-  }
+const totalWeight = components.reduce(
+  (sum, component) =>
+    sum + component.weight,
+  0
+);
 
-  const totalWeight = available.reduce(
-    (sum, component) =>
-      sum + component.weight,
-    0
-  );
-
-  const weightedScore = available.reduce(
-    (sum, component) =>
-      sum +
-      component.score *
-        component.weight,
-    0
-  );
+const weightedScore = components.reduce(
+  (sum, component) =>
+    sum + component.score * component.weight,
+  0
+);
 
   return Math.round(
     (weightedScore / totalWeight) * 100
@@ -239,6 +234,12 @@ type GooglePlace = {
   weekdayDescriptions?: string[];
 };
 
+currentOpeningHours?: {
+  openNow?: boolean;
+  nextCloseTime?: string;
+  nextOpenTime?: string;
+};
+
   types?: string[];
 
   formattedAddress?: string;
@@ -259,6 +260,7 @@ const FIELD_MASK = [
   "places.userRatingCount",
   "places.priceLevel",
   "places.regularOpeningHours",
+  "places.currentOpeningHours",
   "places.types",
   "places.formattedAddress",
   "places.websiteUri",
@@ -397,7 +399,8 @@ async function searchPlaces(
     place.businessStatus !==
       "CLOSED_PERMANENTLY" &&
     place.businessStatus !==
-      "CLOSED_TEMPORARILY"
+      "CLOSED_TEMPORARILY" &&
+    (place.userRatingCount ?? 0) >= 10
 );
 }
 
@@ -510,12 +513,10 @@ export async function buildShops(
         );
 
       const openNow =
-  place
-    .regularOpeningHours
-    ?.openNow ?? false;
+        place.currentOpeningHours?.openNow ?? false;
 
-const closingTime =
-  place.regularOpeningHours?.nextCloseTime ?? null;
+      const closingTime =
+        place.currentOpeningHours?.nextCloseTime ?? null;
 
       return {
         id: place.id!,
@@ -739,27 +740,14 @@ const consistencyScore =
       ) / 10
     : 0;
 
-  const components = [
-  { score: coffeeQualityScore, weight: 0.4 },
-  { score: consistencyScore, weight: 0.2 },
-  { score: milkDrinksScore, weight: 0.15 },
-  { score: espressoScore, weight: 0.15 },
-  { score: filterScore, weight: 0.1 },
-].filter((component) => component.score > 0);
-
-  const totalWeight = components.reduce(
-    (sum, component) => sum + component.weight,
-    0
+  const nearestCupScore =
+  calculateNearestCupScore(
+    coffeeQualityScore,
+    consistencyScore,
+    milkDrinksScore,
+    espressoScore,
+    filterScore
   );
-
-  const weightedScore =
-    components.length > 0
-      ? components.reduce(
-          (sum, component) =>
-            sum + component.score * component.weight,
-          0
-        ) / totalWeight
-      : 0;
 
   return {
     coffeeQualityScore,
@@ -778,8 +766,7 @@ const consistencyScore =
     milkDrinksRatings: milkDrinks.length,
     espressoRatings: espresso.length,
     filterRatings: filter.length,
-    nearestCupScore:
-      Math.round(weightedScore * 10) / 10,
+    nearestCupScore,
   };
 }
 
@@ -1228,41 +1215,7 @@ export function filterAndRank(
       f.activeTags.has(t)
     )
 )
-.filter(
-  (s) => {
-    if (!f.activeDrinkType) {
-      return true;
-    }
 
-    const scores =
-      calculateShopCoffeeScores(
-        s.id,
-        coffeeRatings
-      );
-
-    if (f.activeDrinkType === "Flat white") {
-      return scores.flatWhiteRatings > 0;
-    }
-
-    if (f.activeDrinkType === "Cappuccino") {
-      return scores.cappuccinoRatings > 0;
-    }
-
-    if (f.activeDrinkType === "Latte") {
-      return scores.latteRatings > 0;
-    }
-
-    if (f.activeDrinkType === "Espresso") {
-      return scores.espressoRatings > 0;
-    }
-
-    if (f.activeDrinkType === "Filter") {
-      return scores.filterRatings > 0;
-    }
-
-    return true;
-  }
-)
 .filter(
   (s) =>
     !f.requireOpen ||
