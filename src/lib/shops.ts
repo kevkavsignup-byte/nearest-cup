@@ -1203,197 +1203,198 @@ export function filterAndRank(
   f: Filters,
   coffeeRatings: CoffeeRating[]
 ): Shop[] {
-  return shops
+  const filteredShops = shops
     .filter(
       (s) =>
         s.mins <= f.maxMins
     )
     .filter(
-  (s) =>
-    f.activeTags.size === 0 ||
-    s.tags.some((t) =>
-      f.activeTags.has(t)
+      (s) =>
+        f.activeTags.size === 0 ||
+        s.tags.some((t) =>
+          f.activeTags.has(t)
+        )
     )
-)
-
-.filter(
-  (s) =>
-    !f.requireOpen ||
-    s.openNow
-)
+    .filter(
+      (s) =>
+        !f.requireOpen ||
+        s.openNow
+    )
     .filter(
       (s) =>
         !f.favoritesOnly ||
         f.favorites.has(s.id)
-    )
-     .sort((a, b) => {
-      const aScores =
+    );
+
+  const scoreMap = new Map(
+    filteredShops.map((shop) => {
+      const scores =
         calculateShopCoffeeScores(
-          a.id,
+          shop.id,
           coffeeRatings
         );
 
-      const bScores =
-        calculateShopCoffeeScores(
-          b.id,
-          coffeeRatings
-        );
+      const drinkScore =
+        f.activeDrinkType
+          ? getShopDrinkScore(
+              shop.id,
+              f.activeDrinkType,
+              coffeeRatings
+            )
+          : 0;
 
-        const aDrinkScore =
-  f.activeDrinkType
-    ? getShopDrinkScore(
-        a.id,
-        f.activeDrinkType,
-        coffeeRatings
-      )
-    : 0;
+      const drinkRatings =
+        f.activeDrinkType
+          ? getShopDrinkRatings(
+              shop.id,
+              f.activeDrinkType,
+              coffeeRatings
+            )
+          : 0;
 
-const bDrinkScore =
-  f.activeDrinkType
-    ? getShopDrinkScore(
-        b.id,
-        f.activeDrinkType,
-        coffeeRatings
-      )
-    : 0;
+      return [
+        shop.id,
+        {
+          scores,
+          drinkScore,
+          drinkRatings,
+        },
+      ];
+    })
+  );
 
+  return filteredShops.sort((a, b) => {
+    const aData = scoreMap.get(a.id)!;
+    const bData = scoreMap.get(b.id)!;
 
-const aDrinkRatings =
-  f.activeDrinkType
-    ? getShopDrinkRatings(
-        a.id,
-        f.activeDrinkType,
-        coffeeRatings
-      )
-    : 0;
+    const aScores = aData.scores;
+    const bScores = bData.scores;
 
-const bDrinkRatings =
-  f.activeDrinkType
-    ? getShopDrinkRatings(
-        b.id,
-        f.activeDrinkType,
-        coffeeRatings
-      )
-    : 0;
+    const aDrinkScore = aData.drinkScore;
+    const bDrinkScore = bData.drinkScore;
+
+    const aDrinkRatings = aData.drinkRatings;
+    const bDrinkRatings = bData.drinkRatings;
 
     const aAdjustedDrinkScore =
-  aDrinkRatings > 0
-    ? (
-        aDrinkScore * aDrinkRatings +
-        3.5 * 5
-      ) /
-      (aDrinkRatings + 5)
-    : 0;
+      aDrinkRatings > 0
+        ? (
+            aDrinkScore * aDrinkRatings +
+            3.5 * 5
+          ) /
+          (aDrinkRatings + 5)
+        : 0;
 
-const bAdjustedDrinkScore =
-  bDrinkRatings > 0
-    ? (
-        bDrinkScore * bDrinkRatings +
-        3.5 * 5
-      ) /
-      (bDrinkRatings + 5)
-    : 0;
+    const bAdjustedDrinkScore =
+      bDrinkRatings > 0
+        ? (
+            bDrinkScore * bDrinkRatings +
+            3.5 * 5
+          ) /
+          (bDrinkRatings + 5)
+        : 0;
+
     if (f.activeDrinkType) {
-  const aHasDrinkRating =
-    aDrinkRatings > 0;
+      const aHasDrinkRating =
+        aDrinkRatings > 0;
 
-  const bHasDrinkRating =
-    bDrinkRatings > 0;
+      const bHasDrinkRating =
+        bDrinkRatings > 0;
 
-  if (
-    aHasDrinkRating !==
-    bHasDrinkRating
-  ) {
-    return aHasDrinkRating ? -1 : 1;
-  }
+      if (
+        aHasDrinkRating !==
+        bHasDrinkRating
+      ) {
+        return aHasDrinkRating ? -1 : 1;
+      }
 
-  if (
-    bAdjustedDrinkScore !==
-    aAdjustedDrinkScore
-  ) {
-    return (
-      bAdjustedDrinkScore -
-      aAdjustedDrinkScore
-    );
-  }
-}
+      if (
+        bAdjustedDrinkScore !==
+        aAdjustedDrinkScore
+      ) {
+        return (
+          bAdjustedDrinkScore -
+          aAdjustedDrinkScore
+        );
+      }
+    }
 
-      const NEUTRAL_SCORE = 3.5;
-      const CONFIDENCE_WEIGHT = 5;
+    const NEUTRAL_SCORE = 3.5;
+    const CONFIDENCE_WEIGHT = 5;
 
-      const aAdjustedScore =
-        aScores.coffeeQualityRatings > 0
-          ? (
-              aScores.nearestCupScore *
-                aScores.coffeeQualityRatings +
-              NEUTRAL_SCORE *
-                CONFIDENCE_WEIGHT
-            ) /
-            (
+    const aAdjustedScore =
+      aScores.coffeeQualityRatings > 0
+        ? (
+            aScores.nearestCupScore *
               aScores.coffeeQualityRatings +
+            NEUTRAL_SCORE *
               CONFIDENCE_WEIGHT
-            )
-          : 0;
+          ) /
+          (
+            aScores.coffeeQualityRatings +
+            CONFIDENCE_WEIGHT
+          )
+        : 0;
 
-      const bAdjustedScore =
-        bScores.coffeeQualityRatings > 0
-          ? (
-              bScores.nearestCupScore *
-                bScores.coffeeQualityRatings +
-              NEUTRAL_SCORE *
-                CONFIDENCE_WEIGHT
-            ) /
-            (
+    const bAdjustedScore =
+      bScores.coffeeQualityRatings > 0
+        ? (
+            bScores.nearestCupScore *
               bScores.coffeeQualityRatings +
+            NEUTRAL_SCORE *
               CONFIDENCE_WEIGHT
-            )
-          : 0;
+          ) /
+          (
+            bScores.coffeeQualityRatings +
+            CONFIDENCE_WEIGHT
+          )
+        : 0;
 
-      const aHasNearestCup =
-        aScores.coffeeQualityRatings > 0;
+    const aHasNearestCup =
+      aScores.coffeeQualityRatings > 0;
 
-      const bHasNearestCup =
-        bScores.coffeeQualityRatings > 0;
+    const bHasNearestCup =
+      bScores.coffeeQualityRatings > 0;
 
-      if (
-        aHasNearestCup !==
-        bHasNearestCup
-      ) {
-        return aHasNearestCup ? -1 : 1;
-      }
+    if (
+      aHasNearestCup !==
+      bHasNearestCup
+    ) {
+      return aHasNearestCup ? -1 : 1;
+    }
 
-      if (
-        bAdjustedScore !==
+    if (
+      bAdjustedScore !==
+      aAdjustedScore
+    ) {
+      return (
+        bAdjustedScore -
         aAdjustedScore
-      ) {
-        return (
-          bAdjustedScore -
-          aAdjustedScore
-        );
-      }
+      );
+    }
 
-      const aGoogleScore =
-        a.googleRating +
-        (Math.min(a.reviews, 500) / 500) *
-          0.2;
+    const aGoogleScore =
+      a.googleRating +
+      (Math.min(a.reviews, 500) / 500) *
+        0.2;
 
-      const bGoogleScore =
-        b.googleRating +
-        (Math.min(b.reviews, 500) / 500) *
-          0.2;
+    const bGoogleScore =
+      b.googleRating +
+      (Math.min(b.reviews, 500) / 500) *
+        0.2;
 
-      if (
-        bGoogleScore !==
+    if (
+      bGoogleScore !==
+      aGoogleScore
+    ) {
+      return (
+        bGoogleScore -
         aGoogleScore
-      ) {
-        return (
-          bGoogleScore -
-          aGoogleScore
-        );
-      }
+      );
+    }
 
-      return b.reviews - a.reviews;
-    });
+    return b.reviews - a.reviews;
+  });
 }
 
 export function starString(
