@@ -512,11 +512,18 @@ export async function buildShops(
           filterScore
         );
 
-      const openNow =
-        place.currentOpeningHours?.openNow ?? false;
+     const googleOpenNow =
+  place.currentOpeningHours?.openNow ?? false;
 
-      const closingTime =
-        place.currentOpeningHours?.nextCloseTime ?? null;
+const closingTime =
+  place.currentOpeningHours?.nextCloseTime ?? null;
+
+const openNow =
+  googleOpenNow &&
+  (
+    !closingTime ||
+    new Date(closingTime).getTime() > Date.now()
+  );
 
       return {
         id: place.id!,
@@ -1226,6 +1233,11 @@ export function filterAndRank(
         f.favorites.has(s.id)
     );
 
+  const userProfile =
+    calculateUserCoffeeProfile(
+      coffeeRatings
+    );
+
   const scoreMap = new Map(
     filteredShops.map((shop) => {
       const scores =
@@ -1252,12 +1264,20 @@ export function filterAndRank(
             )
           : 0;
 
+      const personalMatch =
+        calculatePersonalMatch(
+          scores,
+          userProfile,
+          f.activeDrinkType
+        );
+
       return [
         shop.id,
         {
           scores,
           drinkScore,
           drinkRatings,
+          personalMatch,
         },
       ];
     })
@@ -1276,6 +1296,19 @@ export function filterAndRank(
     const aDrinkRatings = aData.drinkRatings;
     const bDrinkRatings = bData.drinkRatings;
 
+    const aPersonalMatch =
+      aData.personalMatch.score;
+
+    const bPersonalMatch =
+      bData.personalMatch.score;
+
+    /*
+     * 1. Drink-specific ranking
+     *
+     * When the user explicitly selects a drink,
+     * cafés with actual ratings for that drink
+     * remain prioritised.
+     */
     const aAdjustedDrinkScore =
       aDrinkRatings > 0
         ? (
@@ -1319,6 +1352,9 @@ export function filterAndRank(
       }
     }
 
+    /*
+     * 2. Nearest Cup overall score
+     */
     const NEUTRAL_SCORE = 3.5;
     const CONFIDENCE_WEIGHT = 5;
 
@@ -1363,16 +1399,54 @@ export function filterAndRank(
       return aHasNearestCup ? -1 : 1;
     }
 
+    /*
+     * 3. Personalisation
+     *
+     * Only influence ranking when we actually
+     * have enough personal data to calculate
+     * a meaningful match.
+     */
+    const aHasPersonalMatch =
+      aPersonalMatch > 0;
+
+    const bHasPersonalMatch =
+      bPersonalMatch > 0;
+
     if (
-      bAdjustedScore !==
-      aAdjustedScore
+      aHasPersonalMatch ||
+      bHasPersonalMatch
     ) {
-      return (
-        bAdjustedScore -
-        aAdjustedScore
-      );
+      const PERSONAL_WEIGHT = 0.10;
+      const BASE_WEIGHT = 0.90;
+
+      const aCombinedScore =
+        aAdjustedScore > 0
+          ? aAdjustedScore * BASE_WEIGHT +
+            aPersonalMatch *
+              PERSONAL_WEIGHT
+          : aPersonalMatch;
+
+      const bCombinedScore =
+        bAdjustedScore > 0
+          ? bAdjustedScore * BASE_WEIGHT +
+            bPersonalMatch *
+              PERSONAL_WEIGHT
+          : bPersonalMatch;
+
+      if (
+        bCombinedScore !==
+        aCombinedScore
+      ) {
+        return (
+          bCombinedScore -
+          aCombinedScore
+        );
+      }
     }
 
+    /*
+     * 4. Google rating
+     */
     const aGoogleScore =
       a.googleRating +
       (Math.min(a.reviews, 500) / 500) *
@@ -1393,6 +1467,9 @@ export function filterAndRank(
       );
     }
 
+    /*
+     * 5. Review count
+     */
     return b.reviews - a.reviews;
   });
 }
