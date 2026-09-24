@@ -1179,11 +1179,6 @@ const matches = selectedDrinkName
           a.confidence
     )[0];
 
-  const isSpecificDrink =
-    strongestMatch.name === "flat whites" ||
-    strongestMatch.name === "cappuccinos" ||
-    strongestMatch.name === "lattes";
-
   const difference = Math.abs(
   strongestMatch.shopScore -
     strongestMatch.userScore
@@ -1285,6 +1280,53 @@ if (f.activeDrinkType) {
           f.activeDrinkType
         );
 
+      const NEUTRAL_SCORE = 3.5;
+      const CONFIDENCE_WEIGHT = 5;
+
+      const adjustedDrinkScore =
+        drinkRatings > 0
+          ? (
+              drinkScore * drinkRatings +
+              NEUTRAL_SCORE * CONFIDENCE_WEIGHT
+            ) /
+            (
+              drinkRatings +
+              CONFIDENCE_WEIGHT
+            )
+          : 0;
+
+      const adjustedScore =
+        scores.coffeeQualityRatings > 0
+          ? (
+              scores.nearestCupScore *
+                scores.coffeeQualityRatings +
+              NEUTRAL_SCORE *
+                CONFIDENCE_WEIGHT
+            ) /
+            (
+              scores.coffeeQualityRatings +
+              CONFIDENCE_WEIGHT
+            )
+          : 0;
+
+      const hasDrinkRating =
+        drinkRatings > 0;
+
+      const hasNearestCup =
+        scores.coffeeQualityRatings > 0;
+
+      const personalMatchScore =
+        personalMatch.score;
+
+      const hasPersonalMatch =
+        personalMatchScore > 0;
+
+      const combinedScore =
+        adjustedScore > 0
+          ? adjustedScore * 0.90 +
+            personalMatchScore * 0.10
+          : personalMatchScore;
+
       return [
         shop.id,
         {
@@ -1292,76 +1334,43 @@ if (f.activeDrinkType) {
           drinkScore,
           drinkRatings,
           personalMatch,
+          adjustedDrinkScore,
+          adjustedScore,
+          hasDrinkRating,
+          hasNearestCup,
+          hasPersonalMatch,
+          combinedScore,
+          googleScore:
+            shop.googleRating +
+            (Math.min(shop.reviews, 500) / 500) *
+              0.2,
         },
       ];
     })
   );
 
-  return filteredShops.sort((a, b) => {
+    return filteredShops.sort((a, b) => {
     const aData = scoreMap.get(a.id)!;
     const bData = scoreMap.get(b.id)!;
 
-    const aScores = aData.scores;
-    const bScores = bData.scores;
-
-    const aDrinkScore = aData.drinkScore;
-    const bDrinkScore = bData.drinkScore;
-
-    const aDrinkRatings = aData.drinkRatings;
-    const bDrinkRatings = bData.drinkRatings;
-
-    const aPersonalMatch =
-      aData.personalMatch.score;
-
-    const bPersonalMatch =
-      bData.personalMatch.score;
-
     /*
      * 1. Drink-specific ranking
-     *
-     * When the user explicitly selects a drink,
-     * cafés with actual ratings for that drink
-     * remain prioritised.
      */
-    const aAdjustedDrinkScore =
-      aDrinkRatings > 0
-        ? (
-            aDrinkScore * aDrinkRatings +
-            3.5 * 5
-          ) /
-          (aDrinkRatings + 5)
-        : 0;
-
-    const bAdjustedDrinkScore =
-      bDrinkRatings > 0
-        ? (
-            bDrinkScore * bDrinkRatings +
-            3.5 * 5
-          ) /
-          (bDrinkRatings + 5)
-        : 0;
-
     if (f.activeDrinkType) {
-      const aHasDrinkRating =
-        aDrinkRatings > 0;
-
-      const bHasDrinkRating =
-        bDrinkRatings > 0;
-
       if (
-        aHasDrinkRating !==
-        bHasDrinkRating
+        aData.hasDrinkRating !==
+        bData.hasDrinkRating
       ) {
-        return aHasDrinkRating ? -1 : 1;
+        return aData.hasDrinkRating ? -1 : 1;
       }
 
       if (
-        bAdjustedDrinkScore !==
-        aAdjustedDrinkScore
+        bData.adjustedDrinkScore !==
+        aData.adjustedDrinkScore
       ) {
         return (
-          bAdjustedDrinkScore -
-          aAdjustedDrinkScore
+          bData.adjustedDrinkScore -
+          aData.adjustedDrinkScore
         );
       }
     }
@@ -1369,91 +1378,39 @@ if (f.activeDrinkType) {
     /*
      * 2. Nearest Cup overall score
      */
-    const NEUTRAL_SCORE = 3.5;
-    const CONFIDENCE_WEIGHT = 5;
-
-    const aAdjustedScore =
-      aScores.coffeeQualityRatings > 0
-        ? (
-            aScores.nearestCupScore *
-              aScores.coffeeQualityRatings +
-            NEUTRAL_SCORE *
-              CONFIDENCE_WEIGHT
-          ) /
-          (
-            aScores.coffeeQualityRatings +
-            CONFIDENCE_WEIGHT
-          )
-        : 0;
-
-    const bAdjustedScore =
-      bScores.coffeeQualityRatings > 0
-        ? (
-            bScores.nearestCupScore *
-              bScores.coffeeQualityRatings +
-            NEUTRAL_SCORE *
-              CONFIDENCE_WEIGHT
-          ) /
-          (
-            bScores.coffeeQualityRatings +
-            CONFIDENCE_WEIGHT
-          )
-        : 0;
-
-    const aHasNearestCup =
-      aScores.coffeeQualityRatings > 0;
-
-    const bHasNearestCup =
-      bScores.coffeeQualityRatings > 0;
+    if (
+      aData.hasNearestCup !==
+      bData.hasNearestCup
+    ) {
+      return aData.hasNearestCup ? -1 : 1;
+    }
 
     if (
-      aHasNearestCup !==
-      bHasNearestCup
+      !aData.hasPersonalMatch &&
+      !bData.hasPersonalMatch &&
+      aData.adjustedScore !==
+        bData.adjustedScore
     ) {
-      return aHasNearestCup ? -1 : 1;
+      return (
+        bData.adjustedScore -
+        aData.adjustedScore
+      );
     }
 
     /*
      * 3. Personalisation
-     *
-     * Only influence ranking when we actually
-     * have enough personal data to calculate
-     * a meaningful match.
      */
-    const aHasPersonalMatch =
-      aPersonalMatch > 0;
-
-    const bHasPersonalMatch =
-      bPersonalMatch > 0;
-
     if (
-      aHasPersonalMatch ||
-      bHasPersonalMatch
+      aData.hasPersonalMatch ||
+      bData.hasPersonalMatch
     ) {
-      const PERSONAL_WEIGHT = 0.10;
-      const BASE_WEIGHT = 0.90;
-
-      const aCombinedScore =
-        aAdjustedScore > 0
-          ? aAdjustedScore * BASE_WEIGHT +
-            aPersonalMatch *
-              PERSONAL_WEIGHT
-          : aPersonalMatch;
-
-      const bCombinedScore =
-        bAdjustedScore > 0
-          ? bAdjustedScore * BASE_WEIGHT +
-            bPersonalMatch *
-              PERSONAL_WEIGHT
-          : bPersonalMatch;
-
       if (
-        bCombinedScore !==
-        aCombinedScore
+        bData.combinedScore !==
+        aData.combinedScore
       ) {
         return (
-          bCombinedScore -
-          aCombinedScore
+          bData.combinedScore -
+          aData.combinedScore
         );
       }
     }
@@ -1461,23 +1418,13 @@ if (f.activeDrinkType) {
     /*
      * 4. Google rating
      */
-    const aGoogleScore =
-      a.googleRating +
-      (Math.min(a.reviews, 500) / 500) *
-        0.2;
-
-    const bGoogleScore =
-      b.googleRating +
-      (Math.min(b.reviews, 500) / 500) *
-        0.2;
-
     if (
-      bGoogleScore !==
-      aGoogleScore
+      bData.googleScore !==
+      aData.googleScore
     ) {
       return (
-        bGoogleScore -
-        aGoogleScore
+        bData.googleScore -
+        aData.googleScore
       );
     }
 
