@@ -1246,23 +1246,37 @@ export function filterAndRank(
           coffeeRatings
         );
 
-      const drinkScore =
-        f.activeDrinkType
-          ? getShopDrinkScore(
-              shop.id,
-              f.activeDrinkType,
-              coffeeRatings
-            )
-          : 0;
+      let drinkScore = 0;
+      let drinkRatings = 0;
 
-      const drinkRatings =
-        f.activeDrinkType
-          ? getShopDrinkRatings(
-              shop.id,
-              f.activeDrinkType,
-              coffeeRatings
-            )
-          : 0;
+if (f.activeDrinkType) {
+  switch (f.activeDrinkType) {
+    case "Flat white":
+      drinkScore = scores.flatWhiteScore;
+      drinkRatings = scores.flatWhiteRatings;
+      break;
+
+    case "Cappuccino":
+      drinkScore = scores.cappuccinoScore;
+      drinkRatings = scores.cappuccinoRatings;
+      break;
+
+    case "Latte":
+      drinkScore = scores.latteScore;
+      drinkRatings = scores.latteRatings;
+      break;
+
+    case "Espresso":
+      drinkScore = scores.espressoScore;
+      drinkRatings = scores.espressoRatings;
+      break;
+
+    case "Filter":
+      drinkScore = scores.filterScore;
+      drinkRatings = scores.filterRatings;
+      break;
+  }
+}
 
       const personalMatch =
         calculatePersonalMatch(
