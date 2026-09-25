@@ -31,6 +31,7 @@ import {
   calculatePersonalMatch,
   calculateShopCoffeeScores,
   calculateUserCoffeeProfile,
+  getRatingConfidence,
   filterAndRank,
   getShopDrinkScore,
   starString,
@@ -69,6 +70,7 @@ const DRINK_TYPES = [
   "Flat white",
   "Cappuccino",
   "Latte",
+  "Americano",
   "Espresso",
   "Filter",
 ];
@@ -114,9 +116,26 @@ export default function Index() {
   []
 );
   const [consistencyRating, setConsistencyRating] = useState(0);
+  const [comparisonToPrevious, setComparisonToPrevious] =
+  useState<"better" | "same" | "worse" | "">("");
   const userCoffeeProfile = calculateUserCoffeeProfile(
     coffeeRatings
   );
+
+  const previousVisit = ratingShop
+  ? coffeeRatings
+      .filter(
+        (rating) =>
+          rating.shopId === ratingShop.id
+      )
+      .sort(
+        (a, b) =>
+          b.visitNumber - a.visitNumber
+      )[0]
+  : undefined;
+
+const isReturnVisit =
+  previousVisit !== undefined;
   
 useEffect(() => {
   const loadCoffeeRatings = async () => {
@@ -762,17 +781,10 @@ const fitMapToShops = () => {
   }
 
   const ratingCount =
-    scores.coffeeQualityRatings;
+  scores.coffeeQualityRatings;
 
-  let confidence = "First Sips";
-
-  if (ratingCount >= 10) {
-    confidence = "Well Tasted";
-  } else if (ratingCount >= 5) {
-    confidence = "A Solid Cup";
-  } else if (ratingCount >= 2) {
-    confidence = "Taking Shape";
-  }
+const confidence =
+  getRatingConfidence(ratingCount);
 
  const personalMatch =
   calculatePersonalMatch(
@@ -789,6 +801,45 @@ const fitMapToShops = () => {
         {" · "}
         {confidence}
       </Text>
+
+  {activeDrinkType && (
+  <Text style={styles.personalMatchCardScore}>
+    {activeDrinkType}{" "}
+    {(() => {
+      const drinkRatings =
+        activeDrinkType === "Flat white"
+          ? scores.flatWhiteRatings
+          : activeDrinkType === "Cappuccino"
+          ? scores.cappuccinoRatings
+          : activeDrinkType === "Latte"
+          ? scores.latteRatings
+          : activeDrinkType === "Espresso"
+          ? scores.espressoRatings
+          : activeDrinkType === "Filter"
+          ? scores.filterRatings
+          : activeDrinkType === "Americano"
+          ? scores.americanoRatings
+          : 0;
+
+      if (drinkRatings === 0) {
+        return "· No ratings yet";
+      }
+
+      return (
+        <>
+          {"★ "}
+          {getShopDrinkScore(
+            item.id,
+            activeDrinkType,
+            coffeeRatings
+          ).toFixed(1)}
+          {" · "}
+          {getRatingConfidence(drinkRatings)}
+        </>
+      );
+    })()}
+  </Text>
+)}
 
      {personalMatch.score > 0 && (
   <Text style={styles.personalMatchCardScore}>
@@ -1178,15 +1229,6 @@ const fitMapToShops = () => {
             </Text>
           </View>
         )}
-
-        {scores.consistencyRatings > 0 && (
-          <View style={styles.profileRow}>
-            <Text style={styles.profileLabel}>Consistency</Text>
-            <Text style={styles.profileValue}>
-              {scores.consistencyScore.toFixed(1)}
-            </Text>
-          </View>
-        )}
       </>
     );
   })()}
@@ -1196,21 +1238,8 @@ const fitMapToShops = () => {
   onPress={() => {
     if (!selectedShop) return;
 
-    const existingRating = coffeeRatings.find(
-      (rating) => rating.shopId === selectedShop.id
-    );
-
-    if (existingRating) {
-      setCoffeeRating(existingRating.rating);
-      setDrinkType(existingRating.drinkType);
-      setConsistencyRating(
-        existingRating.consistencyRating ?? 0
-      );
-    } else {
-      setCoffeeRating(0);
-      setDrinkType("");
-      setConsistencyRating(0);
-    }
+     setCoffeeRating(0);
+  setDrinkType("");
 
     setRatingShop(selectedShop);
   }}
@@ -1298,6 +1327,7 @@ const fitMapToShops = () => {
               "Flat white",
               "Cappuccino",
               "Latte",
+              "Americano",
               "Espresso",
               "Filter",
               "Matcha",
@@ -1325,32 +1355,54 @@ const fitMapToShops = () => {
             ))}
           </View>
 
-          <Text style={styles.ratingQuestion}>
-  How consistent was the coffee?
-</Text>
+{isReturnVisit && (
+  <>
+    <Text style={styles.ratingQuestion}>
+      How did it compare with your last visit?
+    </Text>
 
-<Text style={styles.ratingHint}>
-  How reliably good do you expect the coffee to be here?
-</Text>
+    <Text style={styles.ratingHint}>
+      Was the coffee better, about the same, or not as good?
+    </Text>
 
-<View style={styles.starRatingRow}>
-  {[1, 2, 3, 4, 5].map((star) => (
-    <Pressable
-      key={star}
-      onPress={() => setConsistencyRating(star)}
-    >
-      <Text
-        style={[
-          styles.ratingStar,
-          star <= consistencyRating &&
-            styles.ratingStarSelected,
-        ]}
-      >
-        ★
-      </Text>
-    </Pressable>
-  ))}
-</View>
+    <View style={styles.drinkOptions}>
+      {[
+        { label: "Better", value: "better" },
+        { label: "Same", value: "same" },
+        { label: "Worse", value: "worse" },
+      ].map((option) => (
+        <Pressable
+          key={option.value}
+          onPress={() =>
+            setComparisonToPrevious(
+              option.value as
+                | "better"
+                | "same"
+                | "worse"
+            )
+          }
+          style={[
+            styles.drinkOption,
+            comparisonToPrevious ===
+              option.value &&
+              styles.drinkOptionSelected,
+          ]}
+        >
+          <Text
+            style={[
+              styles.drinkOptionText,
+              comparisonToPrevious ===
+                option.value &&
+                styles.drinkOptionTextSelected,
+            ]}
+          >
+            {option.label}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  </>
+)}
 
           <Pressable
             onPress={async () => {
@@ -1358,18 +1410,25 @@ const fitMapToShops = () => {
   !ratingShop ||
   coffeeRating <= 0 ||
   drinkType === "" ||
-  consistencyRating <= 0
+  (isReturnVisit &&
+    comparisonToPrevious === "")
 ) {
   return;
 }
 
   const newRating: CoffeeRating = {
-    shopId: ratingShop.id,
-    rating: coffeeRating,
-    drinkType,
-    consistencyRating,
-    createdAt: new Date().toISOString(),
-  };
+  id: `${ratingShop.id}-${Date.now()}`,
+  shopId: ratingShop.id,
+  rating: coffeeRating,
+  drinkType,
+  createdAt: new Date().toISOString(),
+  visitNumber: 0,
+  ...(isReturnVisit && comparisonToPrevious
+    ? {
+        comparisonToPrevious,
+      }
+    : {}),
+};
 
   try {
     const existingRatings = await AsyncStorage.getItem(
@@ -1380,17 +1439,15 @@ const fitMapToShops = () => {
       ? JSON.parse(existingRatings)
       : [];
 
-    const existingRatingIndex = ratings.findIndex(
-      (rating) => rating.shopId === newRating.shopId
-    );
+    const previousRatings = ratings.filter(
+  (rating) => rating.shopId === newRating.shopId
+);
 
-    if (existingRatingIndex >= 0) {
-  // Update existing rating for this café
-      ratings[existingRatingIndex] = newRating;
-    } else {
-  // First rating for this café
-      ratings.push(newRating);
-}
+const visitNumber = previousRatings.length + 1;
+
+newRating.visitNumber = visitNumber;
+
+ratings.push(newRating);
 
     await AsyncStorage.setItem(
       COFFEE_RATINGS_KEY,
@@ -1401,6 +1458,7 @@ const fitMapToShops = () => {
 
     setRatingShop(null);
     setCoffeeRating(0);
+    setComparisonToPrevious("");
     setDrinkType("");
     setConsistencyRating(0);
   } catch (error) {
@@ -1408,12 +1466,11 @@ const fitMapToShops = () => {
   }
 }}
 style={[
-    styles.submitRatingBtn,
-    (coffeeRating <= 0 ||
-    drinkType === "" ||
-    consistencyRating <= 0) &&
-      styles.submitRatingBtnDisabled,
-  ]}
+  styles.submitRatingBtn,
+  (coffeeRating <= 0 ||
+    drinkType === "") &&
+    styles.submitRatingBtnDisabled,
+]}
           >
             <Text style={styles.submitRatingText}>
               Submit rating
